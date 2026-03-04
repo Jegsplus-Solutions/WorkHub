@@ -17,14 +17,14 @@ export default async function ExpensesPage() {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: reports }: any = user
-    ? await supabase
-        .from("expense_reports")
-        .select("id, year, week_number, destination, status, submitted_at, approved_at")
-        .eq("employee_id", user.id)
-        .order("year", { ascending: false })
-        .order("week_number", { ascending: false })
-    : { data: [] };
+  if (!user) return null;
+
+  const { data: reports }: any = await supabase
+    .from("expense_reports")
+    .select("id, year, week_number, destination, status, submitted_at, approved_at")
+    .eq("employee_id", user.id)
+    .order("year", { ascending: false })
+    .order("week_number", { ascending: false });
 
   const year = new Date().getFullYear();
   const week = currentWeekNumber();

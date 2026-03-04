@@ -131,8 +131,7 @@ export function TopNav({
 
   async function handleSignOut() {
     await supabase.auth.signOut();
-    router.push("/dashboard");
-    router.refresh();
+    router.push("/login");
   }
 
   const iconFor = { timesheet: Clock, expense: Receipt, person: Users };

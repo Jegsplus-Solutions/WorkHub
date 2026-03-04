@@ -25,15 +25,15 @@ export default async function TimesheetsPage() {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: timesheets }: any = user
-    ? await supabase
-        .from("timesheets")
-        .select("id, year, month, week_number, status, submitted_at, approved_at")
-        .eq("employee_id", user.id)
-        .order("year", { ascending: false })
-        .order("month", { ascending: false })
-        .order("week_number", { ascending: false })
-    : { data: [] };
+  if (!user) return null;
+
+  const { data: timesheets }: any = await supabase
+    .from("timesheets")
+    .select("id, year, month, week_number, status, submitted_at, approved_at")
+    .eq("employee_id", user.id)
+    .order("year", { ascending: false })
+    .order("month", { ascending: false })
+    .order("week_number", { ascending: false });
 
   const { year, month, week } = currentPeriod();
 

@@ -10,9 +10,13 @@ export default async function ReportsPage() {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: profile }: any = user
-    ? await supabase.from("profiles").select("role").eq("id", user.id).single()
-    : { data: null };
+  if (!user) redirect("/login");
+
+  const { data: profile }: any = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
 
   if (profile?.role === "employee") redirect("/dashboard");
 

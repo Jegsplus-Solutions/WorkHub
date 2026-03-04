@@ -10,15 +10,16 @@ export default async function SettingsPage() {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const currentYear = new Date().getFullYear();
-  const emptySingle = { data: null };
+  if (!user) redirect("/login");
 
-  const [role, hoursResult, mileageResult, projectsResult]: any[] = user ? await Promise.all([
+  const currentYear = new Date().getFullYear();
+
+  const [role, hoursResult, mileageResult, projectsResult]: any[] = await Promise.all([
     getCurrentUserRole(),
     supabase.from("hours_config" as any).select("contracted_hours, maximum_hours").eq("employee_id", user.id).single(),
     supabase.from("mileage_rate_config" as any).select("rate_per_km, year").eq("employee_id", user.id).eq("year", currentYear).single(),
     supabase.from("projects").select("id, code, title, active").order("title"),
-  ]) : ["employee", emptySingle, emptySingle, { data: [] }];
+  ]);
 
   return (
     <div className="flex flex-col h-full">
@@ -35,7 +36,7 @@ export default async function SettingsPage() {
               year: mileageResult.data?.year ?? currentYear,
             }}
             projects={projectsResult.data ?? []}
-            userId={user?.id ?? "guest"}
+            userId={user.id}
             userRole={role}
             isAdmin={role === "admin"}
           />
