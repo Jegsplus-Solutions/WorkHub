@@ -73,43 +73,41 @@ export function LoginForm() {
         <span>{loading ? "Signing in…" : "Continue with Microsoft"}</span>
       </button>
 
-      <p className="mt-6 text-center text-xs text-slate-400">
-        By signing in, you agree to your organisation&apos;s data policies.
-        Only authorised accounts from your directory can access WorkHub.
-      </p>
+      <div className="flex items-center gap-3 my-5">
+        <div className="flex-1 border-t border-white/20" />
+        <span className="text-xs text-slate-400">or</span>
+        <div className="flex-1 border-t border-white/20" />
+      </div>
 
-      {DEV_MODE && (
-        <div className="mt-6 pt-6 border-t border-white/10">
-          <p className="text-xs text-amber-400 font-medium mb-3 text-center">
-            ⚠ Dev mode — email/password access
-          </p>
-          <form onSubmit={handleDevLogin} className="space-y-3">
-            <input
-              type="email"
-              placeholder="Email"
-              value={devEmail}
-              onChange={(e) => setDevEmail(e.target.value)}
-              required
-              className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={devPassword}
-              onChange={(e) => setDevPassword(e.target.value)}
-              required
-              className="w-full px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2 rounded-lg bg-amber-500 text-slate-900 font-medium text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Dev Sign In"}
-            </button>
-          </form>
-        </div>
-      )}
+      <form onSubmit={handleDevLogin} className="space-y-3">
+        <input
+          type="email"
+          placeholder="Email"
+          value={devEmail}
+          onChange={(e) => setDevEmail(e.target.value)}
+          required
+          className="w-full px-3 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          value={devPassword}
+          onChange={(e) => setDevPassword(e.target.value)}
+          required
+          className="w-full px-3 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-medium text-sm hover:bg-blue-500 transition-colors disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Sign In"}
+        </button>
+      </form>
+
+      <p className="mt-5 text-center text-xs text-slate-400">
+        By signing in, you agree to your organisation&apos;s data policies.
+      </p>
     </div>
   );
 }
