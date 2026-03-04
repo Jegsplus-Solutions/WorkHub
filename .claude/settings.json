@@ -11,7 +11,12 @@
       "Bash(npx netlify status)",
       "Bash(npx netlify link 2)",
       "Bash(git config user.name)",
-      "Bash(git config user.email)"
+      "Bash(git config user.email)",
+      "Bash(test -f .env.local)",
+      "Bash(ls /c/Users/Artstanding/Music/Examplesss/WorkHub/app/\\\\\\(auth\\\\\\)/)",
+      "Bash(ls /c/Users/Artstanding/Music/Examplesss/WorkHub/app/\\\\\\(auth\\\\\\)/login/)",
+      "Bash(ls /c/Users/Artstanding/Music/Examplesss/WorkHub/app/\\\\\\(auth\\\\\\)/unauthorized/)",
+      "Bash(npx next build)"
     ]
   }
 }
