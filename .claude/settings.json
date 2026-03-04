@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(test -d \"c:/Users/Artstanding/Music/Examplesss/WorkHub/app/\\(dashboard\\)/admin/directory-health\")",
+      "Bash(ls -la \"/c/Users/Artstanding/Music/Examplesss/WorkHub/app/\\(dashboard\\)/\")",
+      "Bash(ls -la \"/c/Users/Artstanding/Music/Examplesss/WorkHub/app/\\(dashboard\\)/dashboard/\")",
+      "Bash(ls -la \"/c/Users/Artstanding/Music/Examplesss/WorkHub/app/\\(dashboard\\)/admin/\")",
+      "Bash(npm run build)",
+      "Bash(netlify status)",
+      "Bash(npx netlify status)",
+      "Bash(npx netlify link 2)",
+      "Bash(git config user.name)",
+      "Bash(git config user.email)"
+    ]
+  }
+}
