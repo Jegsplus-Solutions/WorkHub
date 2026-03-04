@@ -87,7 +87,7 @@ export function Sidebar({
             <Grid3X3 className="w-4 h-4 text-white" />
           </div>
           {!collapsed && (
-            <span className="font-semibold text-white text-lg tracking-tight">WorkHub</span>
+            <span className="font-semibold text-white text-lg tracking-tight">NLSD</span>
           )}
         </div>
         <button

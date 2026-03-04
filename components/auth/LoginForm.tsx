@@ -4,8 +4,6 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
-const DEV_MODE = process.env.NEXT_PUBLIC_DEV_MODE === "true";
-
 export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

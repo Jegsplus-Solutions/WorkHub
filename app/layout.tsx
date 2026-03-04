@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "WorkHub", template: "%s | WorkHub" },
+  title: { default: "NLSD", template: "%s | NLSD" },
   description: "Timesheets, Expenses and Approvals — all in one place.",
 };
 

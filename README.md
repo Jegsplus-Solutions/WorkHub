@@ -1,4 +1,4 @@
-# WorkHub
+# NLSD
 
 A production-ready CRM-style web application for **Timesheets**, **Expenses**, and **Approvals**, built with Next.js 15, Supabase, and deployed to Netlify.
 
@@ -22,7 +22,7 @@ A production-ready CRM-style web application for **Timesheets**, **Expenses**, a
 ## Architecture
 
 ```
-WorkHub/
+NLSD/
 ├── app/                        # Next.js App Router
 │   ├── (auth)/login/           # Microsoft SSO login page
 │   ├── (dashboard)/            # Protected routes (sidebar layout)
@@ -148,9 +148,9 @@ Create two app registrations (or one for both purposes):
 - Create a client secret
 
 **Create Entra security groups:**
-- `WorkHub-Admins` (object ID → `AZURE_GROUP_ADMINS`)
-- `WorkHub-Managers` (object ID → `AZURE_GROUP_MANAGERS`)
-- `WorkHub-Employees` (object ID → `AZURE_GROUP_EMPLOYEES`)
+- `NLSD-Admins` (object ID → `AZURE_GROUP_ADMINS`)
+- `NLSD-Managers` (object ID → `AZURE_GROUP_MANAGERS`)
+- `NLSD-Employees` (object ID → `AZURE_GROUP_EMPLOYEES`)
 
 ---
 
