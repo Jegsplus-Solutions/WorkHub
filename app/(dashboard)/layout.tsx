@@ -12,7 +12,7 @@ export default async function DashboardLayout({
   const { data: { user } } = await supabase.auth.getUser();
 
   let profile: any = null;
-  let role: "employee" | "manager" | "admin" = "employee";
+  let role: string = "employee";
   let pendingApprovals = 0;
 
   if (user) {
