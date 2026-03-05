@@ -124,7 +124,21 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left — Auth form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10" style={{ background: "linear-gradient(135deg, hsl(221 83% 48%) 0%, hsl(221 83% 28%) 100%)" }}>
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10 relative" style={{ background: "linear-gradient(135deg, hsl(221 83% 48%) 0%, hsl(221 83% 28%) 100%)" }}>
+        {/* Dotted mesh grid overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none overflow-hidden"
+        >
+          <div
+            className="absolute inset-[-50%] w-[200%] h-[200%]"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(255,255,255,0.04) 19px, rgba(255,255,255,0.04) 20px), repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(255,255,255,0.04) 19px, rgba(255,255,255,0.04) 20px)",
+              transform: "rotate(45deg)",
+              transformOrigin: "center center",
+            }}
+          />
+        </div>
         <div className="w-full max-w-[420px]">
           {/* Auth Card — outer container */}
           <div className="rounded-2xl bg-white border border-white/50 shadow-lg overflow-hidden">
