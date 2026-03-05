@@ -12,7 +12,7 @@
 
 import type { Config, Context } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
-import { createGraphClient, fetchAllUsers, fetchGroupMembers } from "../../lib/msGraph/client";
+import { createGraphClient, fetchAllUsers, fetchGroupMembers, fetchUserPhoto } from "../../lib/msGraph/client";
 
 
 export const config: Config = {
@@ -174,11 +174,49 @@ export default async function handler(_req: Request, _context: Context) {
     }
   }
 
+  // ── Sync profile photos from Entra ──────────────────────────────────────────
+  let photosSynced = 0;
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+
+  // Reload profiles to check which need photos
+  const { data: profilesForPhotos } = await supabase
+    .from("profiles")
+    .select("id, azure_user_id, avatar_url");
+
+  const needsPhoto = (profilesForPhotos ?? []).filter(
+    (p) => p.azure_user_id && !p.avatar_url
+  );
+
+  for (const profile of needsPhoto) {
+    try {
+      const photoData = await fetchUserPhoto(graph, profile.azure_user_id!);
+      if (!photoData) continue;
+
+      const path = `${profile.id}/avatar.jpg`;
+      const blob = new Blob([photoData], { type: "image/jpeg" });
+
+      const { error: uploadErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+      if (uploadErr) continue;
+
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/avatars/${path}?t=${Date.now()}`;
+      await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl } as any)
+        .eq("id", profile.id);
+
+      photosSynced++;
+    } catch {
+      // Non-fatal: skip photo
+    }
+  }
+
   const elapsed = Date.now() - startedAt;
-  console.log(`[graph-sync] Done in ${elapsed}ms:`, results);
+  console.log(`[graph-sync] Done in ${elapsed}ms:`, { ...results, photosSynced });
 
   return new Response(
-    JSON.stringify({ ok: true, elapsed, ...results }),
+    JSON.stringify({ ok: true, elapsed, ...results, photosSynced }),
     { status: 200, headers: { "Content-Type": "application/json" } }
   );
 }

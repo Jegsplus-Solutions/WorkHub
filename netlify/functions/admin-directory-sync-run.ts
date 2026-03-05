@@ -16,7 +16,7 @@ import type { Context } from "@netlify/functions";
 import { json, getBearerToken, requireMethod } from "./_lib/http";
 import { supabaseAdmin, supabaseUser } from "./_lib/supabase";
 import { writeAudit } from "./_lib/audit";
-import { graphGet, graphGetAllPages } from "./_lib/graph/client";
+import { graphGet, graphGetAllPages, graphGetBinary } from "./_lib/graph/client";
 import { mapWithConcurrency } from "./_lib/graph/concurrency";
 
 
@@ -161,13 +161,49 @@ export default async function handler(req: Request, _context: Context) {
     // Reload profiles to get azure_user_id → profile.id map
     const { data: allProfiles, error: allProfilesErr } = await adminDb
       .from("profiles")
-      .select("id, email, azure_user_id");
+      .select("id, email, azure_user_id, avatar_url");
     if (allProfilesErr) throw new Error(allProfilesErr.message);
 
-    const profileByAzureId = new Map<string, { id: string; email: string }>();
+    const profileByAzureId = new Map<string, { id: string; email: string; avatar_url: string | null }>();
     for (const p of allProfiles ?? []) {
-      if (p.azure_user_id) profileByAzureId.set(p.azure_user_id, { id: p.id, email: p.email ?? "" });
+      if (p.azure_user_id) profileByAzureId.set(p.azure_user_id, { id: p.id, email: p.email ?? "", avatar_url: p.avatar_url ?? null });
     }
+
+    // 5b) Sync profile photos from Entra (skip users who already have an avatar)
+    const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const usersNeedingPhotos = users.filter((u) => {
+      const p = profileByAzureId.get(u.id);
+      return p && !p.avatar_url;
+    });
+
+    let photosSynced = 0;
+    await mapWithConcurrency(usersNeedingPhotos, 5, async (u) => {
+      try {
+        const photoData = await graphGetBinary(
+          `https://graph.microsoft.com/v1.0/users/${u.id}/photo/$value`
+        );
+        if (!photoData) return; // user has no photo in Entra
+
+        const p = profileByAzureId.get(u.id)!;
+        const path = `${p.id}/avatar.jpg`;
+        const blob = new Blob([photoData], { type: "image/jpeg" });
+
+        const { error: uploadErr } = await adminDb.storage
+          .from("avatars")
+          .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+        if (uploadErr) return;
+
+        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/avatars/${path}?t=${Date.now()}`;
+        await adminDb
+          .from("profiles")
+          .update({ avatar_url: publicUrl } as any)
+          .eq("id", p.id);
+
+        photosSynced++;
+      } catch {
+        // Non-fatal: skip photo for this user
+      }
+    });
 
     // 6) Upsert employee_manager relationships
     const managerRows: Array<{ employee_id: string; manager_id: string | null }> = [];
@@ -247,7 +283,7 @@ export default async function handler(req: Request, _context: Context) {
       entityType: "directory_sync",
       entityId: runId,
       action: "sync_success",
-      comment: `Users=${users.length}, profiles=${profileUpdates.length}, managers=${managerRows.length}, roleGrants=${roleRowsToUpsert.length}, rolesRemoved=${rolesRemoved}`,
+      comment: `Users=${users.length}, profiles=${profileUpdates.length}, photos=${photosSynced}, managers=${managerRows.length}, roleGrants=${roleRowsToUpsert.length}, rolesRemoved=${rolesRemoved}`,
     });
 
     return json(200, {
@@ -255,6 +291,7 @@ export default async function handler(req: Request, _context: Context) {
       runId,
       usersFetched: users.length,
       profilesUpdated: profileUpdates.length,
+      photosSynced,
       managerLinksUpserted: managerRows.length,
       roleGrantsUpserted: roleRowsToUpsert.length,
       rolesRemoved,

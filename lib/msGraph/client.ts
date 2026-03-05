@@ -90,6 +90,23 @@ export async function fetchGroupMembers(
 }
 
 /**
+ * Fetches a user's profile photo as binary data.
+ * Returns null if the user has no photo (404).
+ */
+export async function fetchUserPhoto(
+  client: Client,
+  userId: string
+): Promise<ArrayBuffer | null> {
+  try {
+    const res = await client.api(`/users/${userId}/photo/$value`).get();
+    return res as ArrayBuffer;
+  } catch (err: any) {
+    if (err?.statusCode === 404) return null;
+    return null; // Non-fatal: skip photo on error
+  }
+}
+
+/**
  * Uploads a file to SharePoint document library.
  * Uses a PUT request for idempotent upload (overwrites existing file).
  */

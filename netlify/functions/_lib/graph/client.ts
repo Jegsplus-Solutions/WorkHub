@@ -15,6 +15,20 @@ export async function graphGet<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Authenticated GET that returns raw binary data. Returns null on 404 (e.g. user has no photo). */
+export async function graphGetBinary(url: string): Promise<ArrayBuffer | null> {
+  const token = await getGraphAccessToken();
+  const res = await fetch(url.startsWith("https://") ? url : `${BASE}${url}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Graph GET binary ${url} → ${res.status}: ${text}`);
+  }
+  return res.arrayBuffer();
+}
+
 /** Paginate through all @odata.nextLink pages; returns flat array of value items. */
 export async function graphGetAllPages<
   T extends { "@odata.nextLink"?: string; value: unknown[] }
