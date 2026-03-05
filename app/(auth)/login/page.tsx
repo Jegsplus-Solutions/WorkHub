@@ -124,15 +124,17 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left — Auth form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10" style={{ background: "#e8eaef" }}>
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10" style={{ background: "linear-gradient(135deg, hsl(221 83% 48%) 0%, hsl(221 83% 28%) 100%)" }}>
         <div className="w-full max-w-[420px]">
-          {/* Auth Card */}
-          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-6 py-5 sm:px-8 sm:py-6">
-            {/* Logo */}
-            <div className="flex justify-center mb-4">
-              <img src="/company-logo.jpg" alt="NLSD" className="h-20 w-auto object-contain" />
+          {/* Auth Card — outer container */}
+          <div className="rounded-2xl bg-white border border-white/50 shadow-lg overflow-hidden">
+            {/* Logo section */}
+            <div className="px-6 py-2 sm:px-8 sm:py-3 flex justify-center">
+              <img src="/company-logo.jpg" alt="NLSD" className="h-24 w-auto object-contain" />
             </div>
 
+            {/* Form section — inner rounded container */}
+            <div className="rounded-2xl bg-gray-100 px-6 pt-6 pb-5 sm:px-8 sm:pt-8 sm:pb-6">
             {/* Header */}
             <div className="mb-4">
               <h1 className="text-2xl font-bold text-gray-900">
@@ -140,7 +142,7 @@ export default function LoginPage() {
                 {mode === "signup" && "Create Account"}
                 {mode === "forgot" && "Reset Password"}
               </h1>
-              <p className="text-sm text-gray-400 mt-1">
+              <p className="text-sm text-gray-600 mt-1">
                 {mode === "signin" && "Enter your credentials to continue"}
                 {mode === "signup" && "Fill in your details to get started"}
                 {mode === "forgot" && "We\u2019ll send you a reset link"}
@@ -171,7 +173,7 @@ export default function LoginPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+                  <label className="block text-sm font-medium text-gray-800 mb-1.5">Email</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
@@ -183,7 +185,7 @@ export default function LoginPage() {
                       required
                       className={cn(
                         "w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm transition-all duration-200",
-                        "bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
+                        "bg-white focus:bg-white outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
                         getFieldError("email") ? "border-red-300" : "border-gray-200"
                       )}
                     />
@@ -196,7 +198,7 @@ export default function LoginPage() {
                 {/* Password */}
                 {mode !== "forgot" && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1.5">Password</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
@@ -209,7 +211,7 @@ export default function LoginPage() {
                         minLength={mode === "signup" ? 8 : 6}
                         className={cn(
                           "w-full pl-10 pr-12 py-2.5 rounded-xl border text-sm transition-all duration-200",
-                          "bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
+                          "bg-white focus:bg-white outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
                           getFieldError("password") ? "border-red-300" : "border-gray-200"
                         )}
                       />
@@ -259,7 +261,7 @@ export default function LoginPage() {
                 {/* Confirm password (signup only) */}
                 {mode === "signup" && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm password</label>
+                    <label className="block text-sm font-medium text-gray-800 mb-1.5">Confirm password</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <input
@@ -271,7 +273,7 @@ export default function LoginPage() {
                         required
                         className={cn(
                           "w-full pl-10 pr-12 py-2.5 rounded-xl border text-sm transition-all duration-200",
-                          "bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
+                          "bg-white focus:bg-white outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
                           getFieldError("confirm")
                             ? "border-red-300"
                             : confirmPassword && confirmPassword === password
@@ -334,9 +336,9 @@ export default function LoginPage() {
               {/* Divider */}
               {mode !== "forgot" && (
                 <div className="flex items-center gap-3 my-4">
-                  <div className="flex-1 h-px bg-gray-200" />
-                  <span className="text-xs text-gray-400">or</span>
-                  <div className="flex-1 h-px bg-gray-200" />
+                  <div className="flex-1 h-px bg-gray-300" />
+                  <span className="text-xs text-gray-500">or</span>
+                  <div className="flex-1 h-px bg-gray-300" />
                 </div>
               )}
 
@@ -361,7 +363,7 @@ export default function LoginPage() {
                       setLoading(false);
                     }
                   }}
-                  className="w-full py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold text-sm flex items-center justify-center gap-2.5 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                  className="w-full py-2.5 rounded-xl border border-gray-300 bg-white text-gray-800 font-semibold text-sm flex items-center justify-center gap-2.5 hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 21 21" fill="none">
                     <rect x="1" y="1" width="9" height="9" fill="#F25022" />
@@ -374,7 +376,7 @@ export default function LoginPage() {
               )}
 
               {/* Mode switch links */}
-              <div className="mt-4 text-center text-sm text-gray-500">
+              <div className="mt-4 text-center text-sm text-gray-600">
                 {mode === "signin" && (
                   <p>
                     Don&apos;t have an account?{" "}
@@ -401,6 +403,7 @@ export default function LoginPage() {
                 )}
               </div>
             </div>
+          </div>
           </div>
 
           {/* Footer */}
