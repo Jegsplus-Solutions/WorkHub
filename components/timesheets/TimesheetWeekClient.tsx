@@ -234,176 +234,225 @@ export function TimesheetWeekClient({
     }
   }
 
+  const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+
   return (
     <div className="max-w-6xl mx-auto space-y-4">
-      {/* Header bar */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold">
-            Week {weekNumber} of {month}/{year}
-          </h2>
-          <StatusBadge status={status} />
-        </div>
+      {/* ── Header card ── */}
+      <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-[15px] font-bold text-gray-900">
+              {MONTH_NAMES[month]} {year} — Week {weekNumber}
+            </h2>
+            <StatusBadge status={status} />
+          </div>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2">
-          {canEdit && (
-            <>
-              <button
-                onClick={() => save()}
-                disabled={saving}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-accent transition-colors disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                {saving ? "Saving…" : "Save"}
-              </button>
-              <button
-                onClick={() => save("submitted")}
-                disabled={saving || !validation.valid}
-                title={!validation.valid ? "Fix errors before submitting" : ""}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-4 h-4" />
-                Submit for Approval
-              </button>
-            </>
-          )}
-
-          {status === "submitted" && (
-            <button
-              onClick={handleRecall}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-border rounded-lg hover:bg-accent transition-colors"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Recall
-            </button>
-          )}
-
-          {canApprove && (
-            <>
-              <button
-                onClick={handleApprove}
-                disabled={saving}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
-              >
-                <CheckCircle className="w-4 h-4" />
-                Approve
-              </button>
-              <button
-                onClick={() => setShowRejectModal(true)}
-                disabled={saving}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-              >
-                <XCircle className="w-4 h-4" />
-                Reject
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Manager/Finance comments (rejection reason) */}
-      {(status === "rejected" || status === "manager_rejected") && managerComments && (
-        <div className={`p-3 rounded-lg border text-sm ${status === "manager_rejected" ? "bg-orange-50 border-orange-200 text-orange-700" : "bg-red-50 border-red-200 text-red-700"}`}>
-          <strong>{status === "manager_rejected" ? "Manager rejected:" : "Rejected:"}</strong> {managerComments}
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex border-b border-border">
-        {(["entry", "print", "history"] as Tab[]).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors",
-              activeTab === tab
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+          {/* Action buttons */}
+          <div className="flex items-center gap-2">
+            {canEdit && (
+              <>
+                <button
+                  onClick={() => save()}
+                  disabled={saving}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  <Save className="w-4 h-4" />
+                  {saving ? "Saving…" : "Save"}
+                </button>
+                <button
+                  onClick={() => save("submitted")}
+                  disabled={saving || !validation.valid}
+                  title={!validation.valid ? "Fix errors before submitting" : ""}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                  <Send className="w-4 h-4" />
+                  Submit for Approval
+                </button>
+              </>
             )}
-          >
-            {tab === "entry" ? "Time Entry" : tab === "print" ? "Print View" : "History"}
-          </button>
-        ))}
+
+            {status === "submitted" && (
+              <button
+                onClick={handleRecall}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-colors shadow-sm"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Recall
+              </button>
+            )}
+
+            {canApprove && (
+              <>
+                <button
+                  onClick={handleApprove}
+                  disabled={saving}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Approve
+                </button>
+                <button
+                  onClick={() => setShowRejectModal(true)}
+                  disabled={saving}
+                  className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 shadow-sm"
+                >
+                  <XCircle className="w-4 h-4" />
+                  Reject
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Rejection banner */}
+        {(status === "rejected" || status === "manager_rejected") && managerComments && (
+          <div className={`mt-3 p-3 rounded-xl text-sm ${status === "manager_rejected" ? "bg-orange-50 border border-orange-200 text-orange-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
+            <strong>{status === "manager_rejected" ? "Manager rejected:" : "Rejected:"}</strong> {managerComments}
+          </div>
+        )}
       </div>
 
-      {/* Employee notes (draft/rejected only) */}
-      {activeTab === "entry" && canEdit && (
-        <div>
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Notes (optional)
-          </label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add notes for your manager…"
-            className="mt-1 w-full border border-border rounded-lg p-2 text-sm resize-none h-16 focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
+      {/* ── Tabs ── */}
+      <div className="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex border-b border-gray-100 px-2 pt-1">
+          {(["entry", "print", "history"] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "px-4 py-2.5 text-sm font-semibold capitalize border-b-2 transition-colors",
+                activeTab === tab
+                  ? "border-primary text-primary"
+                  : "border-transparent text-gray-400 hover:text-gray-700"
+              )}
+            >
+              {tab === "entry" ? "Time Entry" : tab === "print" ? "Print View" : "History"}
+            </button>
+          ))}
         </div>
-      )}
 
-      {/* Tab content */}
-      {activeTab === "entry" && (
-        <TimesheetGrid
-          rows={rows}
-          settings={settings}
-          projects={projects}
-          billingTypes={billingTypes}
-          weekDates={weekDates}
-          readOnly={!canEdit}
-          onChange={setRows}
-        />
-      )}
+        <div className="p-4">
+          {/* Tab content */}
+          {activeTab === "entry" && (
+            <>
+              <TimesheetGrid
+                rows={rows}
+                settings={settings}
+                projects={projects}
+                billingTypes={billingTypes}
+                weekDates={weekDates}
+                readOnly={!canEdit}
+                onChange={setRows}
+              />
 
-      {activeTab === "print" && (
-        <TimesheetPrintView
-          rows={rows}
-          settings={settings}
-          weekNumber={weekNumber}
-          year={year}
-          weekDates={weekDates}
-          userName={userName}
-          userEmail={userEmail}
-          status={status}
-          projects={projects}
-          billingTypes={billingTypes}
-          submittedAt={submittedAt}
-          approvedAt={approvedAt}
-        />
-      )}
+              {/* ── Notes & Comments below grid ── */}
+              <div className="mt-6 border-t border-gray-100 pt-4 space-y-4">
+                {/* Employee notes */}
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                    Notes
+                  </label>
+                  {canEdit ? (
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Add notes for your manager…"
+                      className="mt-1 w-full border border-gray-200 rounded-xl p-3 text-sm resize-none h-20 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                    />
+                  ) : (
+                    <p className="mt-1 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-xl p-3 min-h-[3rem]">
+                      {notes || "No notes added."}
+                    </p>
+                  )}
+                </div>
 
-      {activeTab === "history" && (
-        <div className="max-w-sm">
-          <AuditTimeline entries={auditLog} />
+                {/* Approval comments (read-only, shown when present) */}
+                {managerComments && (
+                  <div>
+                    <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                      Approval Comments
+                    </label>
+                    <p className={cn(
+                      "mt-1 text-sm border rounded-xl p-3 min-h-[3rem]",
+                      status === "rejected" || status === "manager_rejected"
+                        ? "bg-red-50 border-red-200 text-red-700"
+                        : "bg-gray-50 border-gray-200 text-gray-700"
+                    )}>
+                      {managerComments}
+                    </p>
+                  </div>
+                )}
+
+                {/* Submit for Approval button */}
+                {canEdit && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => save("submitted")}
+                      disabled={saving || !validation.valid}
+                      title={!validation.valid ? "Fix errors before submitting" : ""}
+                      className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    >
+                      <Send className="w-4 h-4" />
+                      {saving ? "Submitting…" : "Submit for Approval"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {activeTab === "print" && (
+            <TimesheetPrintView
+              rows={rows}
+              settings={settings}
+              weekNumber={weekNumber}
+              year={year}
+              weekDates={weekDates}
+              userName={userName}
+              userEmail={userEmail}
+              status={status}
+              projects={projects}
+              billingTypes={billingTypes}
+              submittedAt={submittedAt}
+              approvedAt={approvedAt}
+            />
+          )}
+
+          {activeTab === "history" && (
+            <div className="max-w-sm">
+              <AuditTimeline entries={auditLog} />
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Reject modal */}
       {showRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-background rounded-xl border border-border shadow-2xl w-full max-w-md p-6">
-            <h3 className="font-semibold text-lg mb-2">Reject Timesheet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-2xl w-full max-w-md p-6">
+            <h3 className="font-bold text-lg text-gray-900 mb-2">Reject Timesheet</h3>
+            <p className="text-sm text-gray-500 mb-4">
               Please provide a reason for rejection so the employee can correct their timesheet.
             </p>
             <textarea
               value={rejectionText}
               onChange={(e) => setRejectionText(e.target.value)}
               placeholder="Enter rejection reason…"
-              className="w-full border border-border rounded-lg p-3 text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full border border-gray-200 rounded-xl p-3 text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             />
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => setShowRejectModal(false)}
-                className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-accent"
+                className="px-4 py-2 text-sm font-semibold border border-gray-200 rounded-xl hover:bg-gray-50 shadow-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReject}
                 disabled={!rejectionText.trim() || saving}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 shadow-sm"
               >
                 {saving ? "Rejecting…" : "Reject"}
               </button>

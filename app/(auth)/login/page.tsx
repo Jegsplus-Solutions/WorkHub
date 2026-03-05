@@ -53,44 +53,44 @@ function PartyHat() {
       <circle cx="20" cy="3" r="2" fill="#FDE68A" />
       {/* Sparkles around pom-pom */}
       <line x1="20" y1="-4" x2="20" y2="-7" stroke="#FACC15" strokeWidth="1.2" strokeLinecap="round">
-        <animate attributeName="opacity" values="1;0.2;1" dur="0.8s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite" />
       </line>
       <line x1="26" y1="-1" x2="28.5" y2="-3" stroke="#FDE68A" strokeWidth="1.2" strokeLinecap="round">
-        <animate attributeName="opacity" values="0.2;1;0.2" dur="0.8s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.2;1;0.2" dur="2s" repeatCount="indefinite" />
       </line>
       <line x1="14" y1="-1" x2="11.5" y2="-3" stroke="#FDE68A" strokeWidth="1.2" strokeLinecap="round">
-        <animate attributeName="opacity" values="0.6;1;0.6" dur="0.8s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
       </line>
       <line x1="24" y1="5" x2="27" y2="6" stroke="#FACC15" strokeWidth="1" strokeLinecap="round">
-        <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0.3;1" dur="2.5s" repeatCount="indefinite" />
       </line>
       <line x1="16" y1="5" x2="13" y2="6" stroke="#FACC15" strokeWidth="1" strokeLinecap="round">
-        <animate attributeName="opacity" values="0.3;1;0.3" dur="1s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.3;1;0.3" dur="2.5s" repeatCount="indefinite" />
       </line>
       <circle cx="25" cy="-3" r="0.8" fill="#FACC15">
-        <animate attributeName="opacity" values="0;1;0" dur="1.2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0;1;0" dur="3s" repeatCount="indefinite" />
       </circle>
       <circle cx="14" cy="-4" r="0.8" fill="#FDE68A">
-        <animate attributeName="opacity" values="1;0;1" dur="1.2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0;1" dur="3s" repeatCount="indefinite" />
       </circle>
       {/* Sparkles on hat body */}
       <circle cx="18" cy="15" r="0.9" fill="#FFFFFF">
-        <animate attributeName="opacity" values="0;1;0" dur="1.4s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0;1;0" dur="3.5s" repeatCount="indefinite" />
       </circle>
       <circle cx="23" cy="22" r="0.7" fill="#FFFFFF">
-        <animate attributeName="opacity" values="1;0;1" dur="1.1s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0;1" dur="2.8s" repeatCount="indefinite" />
       </circle>
       <circle cx="15" cy="28" r="0.8" fill="#BFDBFE">
-        <animate attributeName="opacity" values="0.3;1;0.3" dur="0.9s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.3;1;0.3" dur="2.4s" repeatCount="indefinite" />
       </circle>
       <circle cx="25" cy="33" r="0.7" fill="#FFFFFF">
-        <animate attributeName="opacity" values="0;0.8;0" dur="1.3s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0;0.8;0" dur="3.2s" repeatCount="indefinite" />
       </circle>
       <circle cx="12" cy="35" r="0.6" fill="#BFDBFE">
-        <animate attributeName="opacity" values="1;0.2;1" dur="1s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0.2;1" dur="2.6s" repeatCount="indefinite" />
       </circle>
       <circle cx="28" cy="26" r="0.6" fill="#FFFFFF">
-        <animate attributeName="opacity" values="0.5;1;0.5" dur="1.5s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="3.5s" repeatCount="indefinite" />
       </circle>
       {/* Dots */}
       <circle cx="16" cy="20" r="1.5" fill="#FACC15" />

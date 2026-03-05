@@ -73,7 +73,7 @@ export function DirectoryHealthPanel({
     setAutoManaging(true);
     try {
       const token = await getToken();
-      const res = await fetch("/api/admin/auto-manager-roles?keepAdminAsManager=true", {
+      const res = await fetch("/.netlify/functions/admin-auto-manager-roles?keepAdminAsManager=true", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });

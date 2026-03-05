@@ -21,7 +21,7 @@ const BILLING_TYPES = [
   "Leave Without Pay",
 ] as const;
 
-interface TsRow { id: string; week_number: number; status: string; month?: number; year?: number; }
+interface TsRow { id: string; week_number: number; status: string; month?: number; year?: number; employee_notes?: string | null; manager_comments?: string | null; }
 interface ExRow { id: string; week_number: number; year: number; status: string; }
 
 interface Props {
@@ -47,6 +47,7 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
   const [dayEntries, setDayEntries] = useState<Record<number, { billingType: string; project: string; hours: string; manager: string }>>({});
   const [editingBilling, setEditingBilling] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [monthNotes, setMonthNotes] = useState("");
 
   // Load from localStorage after hydration
   useEffect(() => {
@@ -75,6 +76,26 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
     } catch { setDayEntries({}); }
   }, [selectedYear, selectedMonth, hydrated]);
 
+  // Derive selectedTs early so notes can sync
+  const monthTs     = realTimesheets.filter(t => t.year === selectedYear && t.month === selectedMonth);
+  const selectedTs  = monthTs.find(t => t.week_number === activeWeek);
+
+  // Load/save month-level notes from localStorage
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      const key = `monthNotes-${selectedYear}-${selectedMonth}`;
+      const saved = localStorage.getItem(key);
+      setMonthNotes(saved ?? "");
+    } catch { setMonthNotes(""); }
+  }, [selectedYear, selectedMonth, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const key = `monthNotes-${selectedYear}-${selectedMonth}`;
+    localStorage.setItem(key, monthNotes);
+  }, [monthNotes, selectedYear, selectedMonth, hydrated]);
+
   const emptyEntry = { billingType: "", project: "", hours: "", manager: "" };
   const curEntry = selectedDay != null ? (dayEntries[selectedDay] ?? emptyEntry) : null;
   function updateEntry(field: "billingType" | "project" | "hours" | "manager", value: string) {
@@ -87,7 +108,6 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
 
   const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
   const numWeeks    = Math.min(Math.ceil(daysInMonth / 7), 5);
-  const monthTs     = realTimesheets.filter(t => t.year === selectedYear && t.month === selectedMonth);
 
   const approvedCnt       = monthTs.filter(t => t.status === "approved").length;
   const submittedCnt      = monthTs.filter(t => t.status === "submitted").length;
@@ -95,7 +115,6 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
   const missingCnt        = Math.max(0, Math.max(0, week - 1) - submittedOrBetter);
 
   // ── Selected-week derived state ──────────────────────────────────────────
-  const selectedTs    = monthTs.find(t => t.week_number === activeWeek);
   const isCurrentWeek = activeWeek === week;
   const isFutureWeek  = activeWeek > week;
   const startDay      = (activeWeek - 1) * 7 + 1;
@@ -419,6 +438,83 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
           </div>
 
         </div>
+
+      {/* ── Month-level: Notes, Approval Comments, Submit ── */}
+      <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
+        {/* Employee notes for the month */}
+        <div>
+          <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+            Notes — {MONTH_NAMES[selectedMonth]} {selectedYear}
+          </label>
+          {monthTs.length > 0 && monthTs.every(t => t.status !== "draft" && t.status !== "rejected" && t.status !== "manager_rejected") ? (
+            <p className="mt-1 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-2.5 min-h-[2.5rem]">
+              {monthNotes || "No notes added."}
+            </p>
+          ) : (
+            <textarea
+              value={monthNotes}
+              onChange={(e) => setMonthNotes(e.target.value)}
+              placeholder="Add notes for your manager…"
+              className="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm resize-none h-16 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+          )}
+        </div>
+
+        {/* Approval comments — aggregated from all weeks with comments */}
+        {(() => {
+          const comments = monthTs.filter(t => t.manager_comments);
+          if (comments.length === 0) return null;
+          const hasRejection = comments.some(t => t.status === "rejected" || t.status === "manager_rejected");
+          return (
+            <div>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                Approval Comments
+              </label>
+              <div className={`mt-1 text-sm border rounded-lg p-2.5 space-y-2 ${
+                hasRejection ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
+              }`}>
+                {comments.map(t => (
+                  <div key={t.id} className="flex gap-2">
+                    <span className={`text-[11px] font-bold shrink-0 mt-0.5 ${
+                      t.status === "rejected" || t.status === "manager_rejected" ? "text-red-500" : "text-gray-400"
+                    }`}>
+                      W{t.week_number}:
+                    </span>
+                    <span className={hasRejection ? "text-red-700" : "text-gray-700"}>
+                      {t.manager_comments}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Submit for Approval — links to timesheets page for the month */}
+        {(() => {
+          const submittable = monthTs.filter(t => t.status === "draft" || t.status === "rejected" || t.status === "manager_rejected");
+          const hasNoTs = monthTs.length === 0;
+          if (submittable.length === 0 && !hasNoTs) return null;
+          const href = hasNoTs
+            ? `/timesheets/new?year=${selectedYear}&month=${selectedMonth}&week=1`
+            : submittable.length === 1
+            ? `/timesheets/${submittable[0].id}`
+            : `/timesheets`;
+          return (
+            <div className="flex justify-end">
+              <Link
+                href={href}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors shadow-sm"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+                </svg>
+                Submit for Approval
+              </Link>
+            </div>
+          );
+        })()}
+      </div>
 
     </div>
   );

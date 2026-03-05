@@ -110,7 +110,7 @@ export default async function DashboardPage() {
   // Always fetch — used in live mode or as fallback
   const [tsRes, exRes, profRes, hoursRes, mTsRes, mExRes, weekTsRes, pendingTsRes, pendingExRes]: any[] = await Promise.all([
     supabase.from("timesheets")
-      .select("id,year,month,week_number,status,created_at")
+      .select("id,year,month,week_number,status,employee_notes,manager_comments,created_at")
       .eq("employee_id", user.id)
       .order("year",{ascending:false}).order("month",{ascending:false}).order("week_number",{ascending:false})
       .limit(6),
