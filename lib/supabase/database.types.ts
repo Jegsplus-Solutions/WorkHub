@@ -6,6 +6,7 @@ export type AppRole = "employee" | "manager" | "finance" | "admin";
 export type AuditEntity =
   | "timesheet"
   | "expense_report"
+  | "leave_request"
   | "project"
   | "billing_type"
   | "hours_config"
@@ -216,6 +217,13 @@ export interface Database {
           fri: number;
           sat: number;
           weekly_total: number;
+          sun_location: string | null;
+          mon_location: string | null;
+          tue_location: string | null;
+          wed_location: string | null;
+          thu_location: string | null;
+          fri_location: string | null;
+          sat_location: string | null;
         };
         Insert: {
           id?: string;
@@ -229,6 +237,13 @@ export interface Database {
           thu?: number;
           fri?: number;
           sat?: number;
+          sun_location?: string | null;
+          mon_location?: string | null;
+          tue_location?: string | null;
+          wed_location?: string | null;
+          thu_location?: string | null;
+          fri_location?: string | null;
+          sat_location?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["timesheet_rows"]["Insert"]>;
       };
@@ -303,6 +318,46 @@ export interface Database {
           other_note?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["expense_entries"]["Insert"]>;
+      };
+
+      leave_requests: {
+        Row: {
+          id: string;
+          employee_id: string;
+          manager_id: string | null;
+          leave_type: string;
+          start_date: string;
+          end_date: string;
+          hours_per_day: number;
+          total_hours: number;
+          status: WorkStatus;
+          employee_notes: string | null;
+          manager_comments: string | null;
+          attachment_path: string | null;
+          submitted_at: string | null;
+          approved_at: string | null;
+          rejected_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          manager_id?: string | null;
+          leave_type: string;
+          start_date: string;
+          end_date: string;
+          hours_per_day?: number;
+          total_hours?: number;
+          status?: WorkStatus;
+          employee_notes?: string | null;
+          manager_comments?: string | null;
+          attachment_path?: string | null;
+          submitted_at?: string | null;
+          approved_at?: string | null;
+          rejected_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["leave_requests"]["Insert"]>;
       };
 
       audit_log: {

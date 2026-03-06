@@ -110,10 +110,11 @@ describe("calcExpenseWeeklyTotals", () => {
 // ─── validateExpenseWeek ─────────────────────────────────────────────────────
 
 describe("validateExpenseWeek", () => {
-  it("is valid for an empty week", () => {
+  it("rejects an empty week with no data", () => {
     const result = validateExpenseWeek(emptyExpenseDaysMap());
-    expect(result.valid).toBe(true);
-    expect(result.errors).toHaveLength(0);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].message).toMatch(/No expense data entered/);
   });
 
   it("errors on negative values", () => {

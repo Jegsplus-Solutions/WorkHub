@@ -92,7 +92,7 @@ export function MyRequestsCard({ requests }: { requests: Request[] }) {
   const canNext = page < totalPages - 1;
 
   return (
-    <div className="rounded-2xl flex-1 flex flex-col min-h-0 px-4 pt-4 pb-2 overflow-hidden" style={{ background: "#1d4ed8" }}>
+    <div className="rounded-2xl flex flex-col px-4 pt-4 pb-2" style={{ background: "#1d4ed8" }}>
       {/* Header row */}
       <div className="flex items-center justify-between mb-2.5 shrink-0">
         <h3 className="font-bold text-white text-[17px] leading-tight">My Requests</h3>
@@ -128,7 +128,7 @@ export function MyRequestsCard({ requests }: { requests: Request[] }) {
       {requests.length === 0 ? (
         <p className="text-xs text-white/40 text-center py-4">No submissions yet</p>
       ) : (
-        <div className="flex-1 overflow-hidden">
+        <div>
           {visible.map((r, idx) => {
             const isApproved = r.dot === "check-green" || r.dot === "check-yellow";
             return (

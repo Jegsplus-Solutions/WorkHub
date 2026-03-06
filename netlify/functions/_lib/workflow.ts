@@ -1,7 +1,7 @@
-export type WorkStatus = "draft" | "submitted" | "approved" | "rejected";
+export type WorkStatus = "draft" | "submitted" | "approved" | "rejected" | "manager_approved" | "manager_rejected";
 
 export function assertCanSubmit(status: WorkStatus): void {
-  if (status !== "draft" && status !== "rejected") {
+  if (status !== "draft" && status !== "rejected" && status !== "manager_rejected") {
     throw new Error("Only Draft or Rejected items can be submitted.");
   }
 }
@@ -13,7 +13,7 @@ export function assertCanManagerAct(status: WorkStatus): void {
 }
 
 export function isEditableByEmployee(status: WorkStatus): boolean {
-  return status === "draft" || status === "rejected";
+  return status === "draft" || status === "rejected" || status === "manager_rejected";
 }
 
 export function isLocked(status: WorkStatus): boolean {

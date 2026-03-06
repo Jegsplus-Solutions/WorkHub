@@ -71,10 +71,16 @@ export function ExpenseWeekClient({
   const isSubmitted = status === "submitted";
   const isManagerApproved = status === "manager_approved";
   const isManagerRejected = status === "manager_rejected";
-  const canEdit = isDraft || isManagerRejected;
+  const isRejected = status === "rejected";
+  const canEdit = isDraft || isManagerRejected || isRejected;
+  const isApproved = status === "approved";
   const canApprove =
     (isSubmitted && (userRole === "manager" || userRole === "admin" || userRole === "finance")) ||
     (isManagerApproved && (userRole === "admin" || userRole === "finance"));
+  const canReject =
+    canApprove ||
+    (isApproved && (userRole === "admin" || userRole === "finance")) ||
+    (isManagerApproved && (userRole === "manager" || userRole === "admin" || userRole === "finance"));
 
   const validation = validateExpenseWeek(days);
 
@@ -267,18 +273,18 @@ export function ExpenseWeekClient({
           )}
 
           {canApprove && (
-            <>
               <button onClick={handleApprove} disabled={saving}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">
                 <CheckCircle className="w-4 h-4" />
                 Approve
               </button>
+          )}
+          {canReject && (
               <button onClick={() => setShowRejectModal(true)} disabled={saving}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
                 <XCircle className="w-4 h-4" />
                 Reject
               </button>
-            </>
           )}
         </div>
       </div>

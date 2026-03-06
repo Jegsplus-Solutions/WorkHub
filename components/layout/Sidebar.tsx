@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Clock,
   Receipt,
+  CalendarOff,
   CheckSquare,
   Settings,
   Users,
@@ -32,8 +32,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Grid3X3 },
-  { href: "/timesheets", label: "Timesheets", icon: Clock },
   { href: "/expenses", label: "Expenses", icon: Receipt },
+  { href: "/leave", label: "Leave", icon: CalendarOff },
   { href: "/approvals", label: "Approvals", icon: CheckSquare, managerOnly: true },
   { href: "/reports", label: "Reports", icon: BarChart3, managerOnly: true },
   { href: "/people", label: "People", icon: Users, adminOnly: true },

@@ -15,19 +15,9 @@ export default async function ApprovalsPage() {
 
   // Managers see items awaiting their review (submitted);
   // Finance/Admin see items awaiting final approval (manager_approved) + submitted.
-  const tsStatuses = role === "manager" ? ["submitted"] : ["manager_approved", "submitted"];
   const exStatuses = role === "manager" ? ["submitted"] : ["manager_approved", "submitted"];
 
-  const [tsResult, exResult]: any[] = await Promise.all([
-    supabase
-      .from("timesheets")
-      .select(`
-        id, year, month, week_number, status, submitted_at,
-        employee:profiles!employee_id(id, display_name, email, department),
-        timesheet_rows(weekly_total)
-      `)
-      .in("status", tsStatuses)
-      .order("submitted_at"),
+  const [exResult]: any[] = await Promise.all([
     supabase
       .from("expense_reports")
       .select(`
@@ -38,22 +28,6 @@ export default async function ApprovalsPage() {
       .in("status", exStatuses)
       .order("submitted_at"),
   ]);
-
-  const timesheets = (tsResult.data ?? []).map((t: any) => {
-    const totalHours = (t.timesheet_rows ?? []).reduce(
-      (s: number, r: any) => s + (r.weekly_total ?? 0), 0
-    );
-    return {
-      id: t.id,
-      type: "timesheet" as const,
-      period: `${monthName(t.month)} ${t.year} — Week ${t.week_number}`,
-      status: t.status,
-      amountLabel: `${totalHours.toFixed(1)}h`,
-      submittedAt: t.submitted_at,
-      user: { id: t.employee?.id, display_name: t.employee?.display_name ?? "—", email: t.employee?.email ?? "", department: t.employee?.department },
-      href: `/timesheets/${t.id}`,
-    };
-  });
 
   const expenses = (exResult.data ?? []).map((e: any) => {
     const total = (e.expense_entries ?? []).reduce(
@@ -75,7 +49,7 @@ export default async function ApprovalsPage() {
     };
   });
 
-  const items = [...timesheets, ...expenses].sort(
+  const items = [...expenses].sort(
     (a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
   );
 

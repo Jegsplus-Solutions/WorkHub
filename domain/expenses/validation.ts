@@ -72,6 +72,19 @@ export function validateExpenseWeek(
     }
   }
 
+  // At least one day must have some expense data to submit
+  const hasAnyData = EXPENSE_DAYS.some((day) => {
+    const entry = days[day];
+    return NUMERIC_FIELDS.some((field) => (entry[field] as number) > 0);
+  });
+  if (!hasAnyData) {
+    issues.push({
+      field: "all",
+      message: "No expense data entered. Fill in at least one day before submitting.",
+      severity: "error",
+    });
+  }
+
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");
 

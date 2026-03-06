@@ -1,6 +1,6 @@
 import { createServerSupabaseClient, getCurrentUserRole } from "@/lib/supabase/server";
 import Link from "next/link";
-import { format } from "date-fns";
+import { format, getISOWeek } from "date-fns";
 import type { Metadata } from "next";
 import { ProfileImageUpload } from "@/components/dashboard/ProfileImageUpload";
 import { MyRequestsCard } from "@/components/dashboard/MyRequestsCard";
@@ -91,24 +91,19 @@ function getGreeting() {
   return h < 12 ? "Morning" : h < 17 ? "Afternoon" : "Evening";
 }
 
-// Map JS getDay() (0=Sun…6=Sat) → timesheet_rows column name (Mon–Sat only)
-const DOW_TO_COL: Record<number, string> = { 1:"mon", 2:"tue", 3:"wed", 4:"thu", 5:"fri", 6:"sat" };
-
-
 // ─── Main page ─────────────────────────────────────────────────────────────────
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const now   = new Date();
   const { year, month, week } = currentPeriod();
-  const todayDow = now.getDay();
 
   const role = await getCurrentUserRole();
   const isApprover = role === "manager" || role === "admin" || role === "finance";
+  const isoWeek = String(getISOWeek(new Date())).padStart(2, "0");
   // Always fetch — used in live mode or as fallback
-  const [tsRes, exRes, profRes, hoursRes, mTsRes, mExRes, weekTsRes, pendingTsRes, pendingExRes]: any[] = await Promise.all([
+  const [tsRes, exRes, profRes, wkExRes, pendingExRes, pendingTsRes]: any[] = await Promise.all([
     supabase.from("timesheets")
       .select("id,year,month,week_number,status,employee_notes,manager_comments,created_at")
       .eq("employee_id", user.id)
@@ -122,27 +117,19 @@ export default async function DashboardPage() {
     supabase.from("profiles")
       .select("display_name,email,avatar_url,department,job_title")
       .eq("id", user.id).single(),
-    supabase.from("hours_config" as any)
-      .select("contracted_hours").eq("employee_id", user.id).single(),
-    supabase.from("timesheets")
-      .select("timesheet_rows(weekly_total)")
-      .eq("employee_id",user.id).eq("year",year).eq("month",month),
     supabase.from("expense_reports")
       .select("expense_entries(mileage_cost_claimed,lodging_amount,breakfast_amount,lunch_amount,dinner_amount,other_amount)")
-      .eq("employee_id",user.id).eq("year",year),
-    supabase.from("timesheets")
-      .select("week_number, timesheet_rows(weekly_total, mon, tue, wed, thu, fri, sat)")
-      .eq("employee_id",user.id).eq("year",year).eq("month",month),
+      .eq("employee_id",user.id).eq("year",year).eq("week_number",isoWeek),
     isApprover
-      ? supabase.from("timesheets")
-          .select("id, year, month, week_number, submitted_at, employee:profiles!employee_id(display_name)")
+      ? supabase.from("expense_reports")
+          .select("id, year, week_number, submitted_at, employee:profiles!employee_id(display_name)")
           .eq("status", "submitted")
           .order("submitted_at")
           .limit(5)
       : Promise.resolve({ data: [] }),
     isApprover
-      ? supabase.from("expense_reports")
-          .select("id, year, week_number, submitted_at, employee:profiles!employee_id(display_name)")
+      ? supabase.from("timesheets")
+          .select("id, year, month, week_number, submitted_at, employee:profiles!employee_id(display_name)")
           .eq("status", "submitted")
           .order("submitted_at")
           .limit(5)
@@ -153,30 +140,13 @@ export default async function DashboardPage() {
   const realProfile      = profRes.data;
   const realTimesheets   = tsRes.data ?? [];
   const realExpenses     = exRes.data ?? [];
-  const contractedHours  = isDemoMode ? DEMO.contractedHours : (hoursRes.data?.contracted_hours ?? 40);
 
-  const realMonthlyHours = (mTsRes.data ?? [])
-    .flatMap((t:any) => t.timesheet_rows ?? [])
-    .reduce((s:number, r:any) => s + (r.weekly_total ?? 0), 0);
-
-  const allWeekTs = weekTsRes.data ?? [];
-
-  // Current week rows for weekly/today totals
-  const currentWeekRows = ((allWeekTs.find((t:any) => t.week_number === week)
-    ?.timesheet_rows) ?? []) as any[];
-  const realWeeklyHours = currentWeekRows.reduce((s:number, r:any) => s + (r.weekly_total ?? 0), 0);
-  const todayCol = DOW_TO_COL[todayDow];
-  const realTodayHours = todayCol
-    ? currentWeekRows.reduce((s:number, r:any) => s + (r[todayCol] ?? 0), 0)
-    : 0;
-
-
-  const expEntries = (mExRes.data ?? []).flatMap((e:any) => e.expense_entries ?? []);
+  const expEntries = (wkExRes.data ?? []).flatMap((e:any) => e.expense_entries ?? []);
   const catMileage = expEntries.reduce((s:number, e:any) => s + (e.mileage_cost_claimed ?? 0), 0);
   const catLodging = expEntries.reduce((s:number, e:any) => s + (e.lodging_amount ?? 0), 0);
   const catMeals   = expEntries.reduce((s:number, e:any) => s + (e.breakfast_amount ?? 0) + (e.lunch_amount ?? 0) + (e.dinner_amount ?? 0), 0);
   const catOther   = expEntries.reduce((s:number, e:any) => s + (e.other_amount ?? 0), 0);
-  const realMonthlyEx = catMileage + catLodging + catMeals + catOther;
+  const weeklyExpenseTotal = catMileage + catLodging + catMeals + catOther;
 
   const displayName   = isDemoMode ? DEMO.fullName  : (realProfile?.display_name ?? user.email ?? "");
   const firstName     = isDemoMode ? DEMO.name      : (displayName.split(" ")[0] ?? "there");
@@ -187,15 +157,9 @@ export default async function DashboardPage() {
   const department    = isDemoMode ? DEMO.department: (realProfile?.department ?? "");
   const initials      = displayName.charAt(0).toUpperCase() || "U";
 
-  const monthlyHours  = isDemoMode ? DEMO.monthlyHours  : realMonthlyHours;
-  const weeklyHours   = isDemoMode ? DEMO.weeklyHours   : realWeeklyHours;
-  const todayHours    = isDemoMode ? DEMO.todayHours    : realTodayHours;
-  const monthlyExpenses = isDemoMode ? DEMO.monthlyExpenses : realMonthlyEx;
+  const weeklyExpenses = isDemoMode ? DEMO.monthlyExpenses : weeklyExpenseTotal;
 
-  const newTsHref = `/timesheets/new?year=${year}&month=${month}&week=${week}`;
   const newExHref = `/expenses/new?year=${year}&week=${String(week).padStart(2,"0")}`;
-
-  const monthlyTarget = contractedHours * 4;
 
   // Expense breakdown — live categories, filtered to non-zero
   const liveExpBreakdown = [
@@ -207,16 +171,9 @@ export default async function DashboardPage() {
   const expBreakdown = isDemoMode ? DEMO.expenseBreakdown : liveExpBreakdown;
 
   // Pending approvals (managers/admins/finance)
-  const pendingTs = (pendingTsRes.data ?? []) as any[];
   const pendingEx = (pendingExRes.data ?? []) as any[];
+  const pendingTs = (pendingTsRes.data ?? []) as any[];
   const pendingItems = [
-    ...pendingTs.map(t => ({
-      id: t.id, type: "timesheet" as const,
-      name: (t.employee as any)?.display_name ?? "Unknown",
-      period: `${MONTH_NAMES[t.month ?? 1]} Wk${t.week_number}`,
-      submittedAt: t.submitted_at as string | null,
-      href: `/timesheets/${t.id}`,
-    })),
     ...pendingEx.map(e => ({
       id: e.id, type: "expense" as const,
       name: (e.employee as any)?.display_name ?? "Unknown",
@@ -224,19 +181,29 @@ export default async function DashboardPage() {
       submittedAt: e.submitted_at as string | null,
       href: `/expenses/${e.id}`,
     })),
+    ...pendingTs.map((t: any) => ({
+      id: t.id, type: "timesheet" as const,
+      name: (t.employee as any)?.display_name ?? "Unknown",
+      period: t.week_number === 0 ? `${MONTH_NAMES[t.month ?? 1]} ${t.year}` : `${MONTH_NAMES[t.month ?? 1]} Wk${t.week_number}`,
+      submittedAt: t.submitted_at as string | null,
+      href: `/timesheets`,
+    })),
   ].sort((a, b) => (a.submittedAt ?? "").localeCompare(b.submittedAt ?? "")).slice(0, 6);
+
+  const dotForStatus = (s: string) =>
+    s === "approved" ? "check-green" : s === "manager_approved" ? "check-blue" : s === "submitted" ? "pending-gray" : s === "manager_rejected" ? "rejected-orange" : s === "rejected" ? "rejected-red" : "ring-blue";
 
   // My Requests
   const requests = isDemoMode ? DEMO.requests : [
     ...realTimesheets.slice(0, 3).map((t:any) => ({
       id: t.id, kind: "timesheet", label: "Time Sheet",
-      sub: `${MONTH_NAMES[t.month ?? 1]} Wk${t.week_number}`,
-      dot: t.status === "approved" ? "check-green" : t.status === "manager_approved" ? "check-blue" : t.status === "submitted" ? "pending-gray" : t.status === "manager_rejected" ? "rejected-orange" : t.status === "rejected" ? "rejected-red" : "ring-blue",
+      sub: t.week_number === 0 ? `${MONTH_NAMES[t.month ?? 1]} ${t.year}` : `${MONTH_NAMES[t.month ?? 1]} Wk${t.week_number}`,
+      dot: dotForStatus(t.status),
     })),
     ...realExpenses.slice(0, 2).map((e:any) => ({
       id: e.id, kind: "expense", label: "Expense",
       sub: `${e.year} Wk${e.week_number}`,
-      dot: e.status === "approved" ? "check-green" : e.status === "manager_approved" ? "check-blue" : e.status === "submitted" ? "pending-gray" : e.status === "manager_rejected" ? "rejected-orange" : e.status === "rejected" ? "rejected-red" : "ring-blue",
+      dot: dotForStatus(e.status),
     })),
   ];
 
@@ -263,7 +230,7 @@ export default async function DashboardPage() {
               </svg>
               01–24 September
             </button>
-            <Link href={newTsHref} className="flex items-center gap-1.5 bg-gray-900 text-white text-sm font-semibold px-4 py-1.5 rounded-xl hover:bg-gray-800 transition-colors">
+            <Link href={newExHref} className="flex items-center gap-1.5 bg-gray-900 text-white text-sm font-semibold px-4 py-1.5 rounded-xl hover:bg-gray-800 transition-colors">
               Quick Add
               <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd"/>
@@ -314,7 +281,7 @@ export default async function DashboardPage() {
                     <h3 className="font-bold text-gray-800 text-sm">Pending Approvals</h3>
                     {pendingItems.length > 0 && (
                       <span className="bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
-                        {pendingTs.length + pendingEx.length}
+                        {pendingEx.length + pendingTs.length}
                       </span>
                     )}
                   </div>
@@ -338,12 +305,10 @@ export default async function DashboardPage() {
                     {pendingItems.map(item => (
                       <Link key={item.id} href={item.href}>
                         <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-100 hover:bg-amber-100 transition-colors">
-                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                            item.type === "timesheet" ? "bg-primary/15" : "bg-orange-100"
-                          }`}>
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${item.type === "timesheet" ? "bg-blue-100" : "bg-orange-100"}`}>
                             {item.type === "timesheet" ? (
-                              <svg className="w-3.5 h-3.5 text-primary" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd"/>
+                              <svg className="w-3.5 h-3.5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
                               </svg>
                             ) : (
                               <svg className="w-3.5 h-3.5 text-orange-600" viewBox="0 0 20 20" fill="currentColor">
@@ -360,9 +325,9 @@ export default async function DashboardPage() {
                         </div>
                       </Link>
                     ))}
-                    {(pendingTs.length + pendingEx.length) > 6 && (
+                    {(pendingEx.length + pendingTs.length) > 6 && (
                       <Link href="/approvals" className="block text-center text-[11px] text-primary font-semibold py-1 hover:text-primary/80">
-                        +{pendingTs.length + pendingEx.length - 6} more
+                        +{pendingEx.length + pendingTs.length - 6} more
                       </Link>
                     )}
                   </div>
@@ -382,58 +347,9 @@ export default async function DashboardPage() {
               realTimesheets={realTimesheets as any[]}
               realExpenses={realExpenses as any[]}
               newExHref={newExHref}
+              userRole={role as any}
+              userId={user.id}
             />
-
-            {/* ─── Progress card: monthly hours tracker + weekly bar chart ─── */}
-            <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-4">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-gray-900 text-sm">Hours Progress</h3>
-                <span className="text-[11px] text-gray-400">{MONTH_NAMES[month]} {year}</span>
-              </div>
-
-              {/* Monthly stat */}
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-[32px] font-extrabold text-gray-900 leading-none tracking-tight">
-                  {monthlyHours.toFixed(1)}
-                </span>
-                <span className="text-[16px] font-bold text-gray-900 leading-none">h</span>
-                <span className="text-[13px] text-gray-400 ml-1">/ {monthlyTarget}h target</span>
-              </div>
-              <p className="text-[11px] text-gray-400 mb-2">Total hours logged this month</p>
-
-              {/* Progress bar */}
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-1">
-                <div
-                  className="h-full bg-primary rounded-full"
-                  style={{ width: `${Math.min(monthlyTarget > 0 ? (monthlyHours / monthlyTarget) * 100 : 0, 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between mb-4">
-                <span className="text-[10px] text-gray-400">
-                  {monthlyTarget > 0 ? Math.round((monthlyHours / monthlyTarget) * 100) : 0}% of target
-                </span>
-                <span className="text-[10px] text-gray-400">
-                  {Math.max(0, monthlyTarget - monthlyHours).toFixed(1)}h remaining
-                </span>
-              </div>
-
-              {/* This week stat */}
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">This Week</span>
-                <div className="flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary"/>
-                  <span className="text-[11px] text-gray-500">
-                    Today: <span className="font-semibold text-gray-700">{todayHours.toFixed(1)}h</span>
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-[22px] font-extrabold text-gray-900 leading-none">{weeklyHours.toFixed(1)}</span>
-                <span className="text-[13px] font-bold text-gray-900 leading-none">h</span>
-                <span className="text-[11px] text-gray-400 ml-1">/ {contractedHours}h contracted</span>
-              </div>
-            </div>
 
           </div>
 
@@ -443,11 +359,14 @@ export default async function DashboardPage() {
             {/* Expense card — pixel-perfect reference design */}
             <div className="rounded-2xl bg-white border border-gray-100 shadow-sm px-4 pt-4 pb-4 shrink-0">
 
-              {/* Header row: "Expense" label left, total amount right */}
+              {/* Header row: "Week N Expense" label left, total amount right */}
               <div className="flex items-start justify-between mb-3">
-                <span className="text-[15px] font-semibold text-gray-700 mt-1">Expense</span>
+                <div className="flex flex-col mt-1">
+                  <span className="text-[15px] font-semibold text-gray-700">Expense</span>
+                  <span className="text-[11px] text-gray-400 font-medium">Week {parseInt(isoWeek)}, {year}</span>
+                </div>
                 <span className="text-[38px] font-extrabold text-gray-900 leading-none tracking-tight">
-                  ${isDemoMode ? DEMO.monthlyExpenses : monthlyExpenses.toFixed(0)}
+                  ${isDemoMode ? DEMO.monthlyExpenses : weeklyExpenses.toFixed(0)}
                 </span>
               </div>
 

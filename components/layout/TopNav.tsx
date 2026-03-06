@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
-import { Search, Settings, X, Clock, Receipt, Users, LogOut, ShieldCheck, HeartPulse } from "lucide-react";
+import { Search, Settings, X, Receipt, Users, LogOut, ShieldCheck, HeartPulse } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
 interface SearchResult {
   id: string;
-  type: "timesheet" | "expense" | "person";
+  type: "expense" | "person";
   label: string;
   sublabel: string;
   href: string;
@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["employee", "manager", "admin"] },
   { href: "/timesheets", label: "Time Sheet", roles: ["employee", "manager", "admin"] },
   { href: "/expenses", label: "Expense", roles: ["employee", "manager", "admin"] },
+  { href: "/leave", label: "Leave", roles: ["employee", "manager", "admin"] },
   { href: "/approvals", label: "Team", roles: ["manager", "admin"], teamHref: { manager: "/approvals", admin: "/people" } },
   { href: "/reports", label: "Documents", roles: ["manager", "admin"] },
 ];
@@ -111,16 +112,12 @@ export function TopNav({
         const { data: matchingProfiles }: any = await (supabase.from as any)("profiles").select("id, display_name, email")
           .or(`display_name.ilike.%${query}%,email.ilike.%${query}%`).limit(10);
         const employeeIds = (matchingProfiles ?? []).map((p: any) => p.id);
-        const [ts, ex]: any[] = await Promise.all([
-          employeeIds.length > 0
-            ? (supabase.from as any)("timesheets").select("id, year, month, week_number, status").in("employee_id", employeeIds).limit(5)
-            : Promise.resolve({ data: [] as any[] }),
+        const [ex]: any[] = await Promise.all([
           employeeIds.length > 0
             ? (supabase.from as any)("expense_reports").select("id, year, week_number, status").in("employee_id", employeeIds).limit(5)
             : Promise.resolve({ data: [] as any[] }),
         ]);
         setResults([
-          ...(ts.data ?? []).map((t: any) => ({ id: t.id, type: "timesheet" as const, label: `Timesheet — ${MONTHS[(t.month ?? 1) - 1]} ${t.year} Wk${t.week_number}`, sublabel: t.status, href: `/timesheets/${t.id}` })),
           ...(ex.data ?? []).map((e: any) => ({ id: e.id, type: "expense" as const, label: `Expenses — ${e.year} Wk${e.week_number}`, sublabel: e.status, href: `/expenses/${e.id}` })),
           ...(matchingProfiles ?? []).map((p: any) => ({ id: p.id, type: "person" as const, label: p.display_name, sublabel: p.email, href: `/people/${p.id}` })),
         ]);
@@ -134,7 +131,7 @@ export function TopNav({
     router.push("/login");
   }
 
-  const iconFor = { timesheet: Clock, expense: Receipt, person: Users };
+  const iconFor = { expense: Receipt, person: Users };
   const visibleNavItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
   function navHref(item: NavItem) {

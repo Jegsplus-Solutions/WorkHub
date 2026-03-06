@@ -12,12 +12,14 @@
  * - Logs the run to directory_sync_runs
  */
 
-import type { Context } from "@netlify/functions";
+import type { Config, Context } from "@netlify/functions";
 import { json, getBearerToken, requireMethod } from "./_lib/http";
 import { supabaseAdmin, supabaseUser } from "./_lib/supabase";
 import { writeAudit } from "./_lib/audit";
 import { graphGet, graphGetAllPages, graphGetBinary } from "./_lib/graph/client";
 import { mapWithConcurrency } from "./_lib/graph/concurrency";
+
+export const config: Config = { path: "/api/admin/directory-sync-run" };
 
 
 const ADMIN_GROUP_ID = process.env.AZURE_GROUP_ADMINS!;

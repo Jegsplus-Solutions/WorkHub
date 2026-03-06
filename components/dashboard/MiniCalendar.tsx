@@ -135,11 +135,6 @@ function ActivityDetail({ act }: { act: DayActivity }) {
         </div>
       )}
       <div className="flex gap-3 mt-0.5">
-        {act.timesheetId && act.timesheetId !== "demo" && (
-          <Link href={`/timesheets/${act.timesheetId}`} className="text-xs font-semibold text-primary hover:underline">
-            View Timesheet →
-          </Link>
-        )}
         {act.expenseReportId && act.expenseReportId !== "demo" && (
           <Link href={`/expenses/${act.expenseReportId}`} className="text-xs font-semibold text-orange-600 hover:underline">
             View Expense →
@@ -438,20 +433,12 @@ export function MiniCalendar({ userId }: Props) {
                   )}
 
                   {/* Quick links */}
-                  {(act.timesheetId || act.expenseReportId) && (
+                  {act.expenseReportId && act.expenseReportId !== "demo" && (
                     <div className="flex gap-2 pt-0.5">
-                      {act.timesheetId && act.timesheetId !== "demo" && (
-                        <Link href={`/timesheets/${act.timesheetId}`}
-                          className="flex-1 text-center text-[11px] font-semibold text-primary border border-primary/25 bg-white rounded-lg py-1.5 hover:bg-primary/10 transition-colors">
-                          View Timesheet →
-                        </Link>
-                      )}
-                      {act.expenseReportId && act.expenseReportId !== "demo" && (
-                        <Link href={`/expenses/${act.expenseReportId}`}
-                          className="flex-1 text-center text-[11px] font-semibold text-orange-600 border border-orange-200 bg-white rounded-lg py-1.5 hover:bg-orange-50 transition-colors">
-                          View Expense →
-                        </Link>
-                      )}
+                      <Link href={`/expenses/${act.expenseReportId}`}
+                        className="flex-1 text-center text-[11px] font-semibold text-orange-600 border border-orange-200 bg-white rounded-lg py-1.5 hover:bg-orange-50 transition-colors">
+                        View Expense →
+                      </Link>
                     </div>
                   )}
                 </>

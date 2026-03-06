@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useState, useEffect, useRef } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+
 
 const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -21,6 +23,39 @@ const BILLING_TYPES = [
   "Leave Without Pay",
 ] as const;
 
+const LOCATIONS = [
+  "Beauval",
+  "Brabant Lake",
+  "Buffalo Narrows",
+  "Cole Bay",
+  "Cumberland House",
+  "Green Lake",
+  "Jans Bay",
+  "La Loche",
+  "La Ronge/Air Ronge",
+  "Pinehouse",
+  "Sandy Bay",
+  "St George's Hill",
+  "Stony Rapids",
+  "Timber Bay",
+  "Uranium City",
+  "Weyakwin",
+] as const;
+
+const EXPENSE_STRIPES = [
+  "#f97316",
+  "repeating-linear-gradient(135deg,#fb923c 0px,#fb923c 4px,#fed7aa 4px,#fed7aa 8px)",
+  "repeating-linear-gradient(135deg,#fbbf24 0px,#fbbf24 4px,#fef3c7 4px,#fef3c7 8px)",
+  "repeating-linear-gradient(135deg,#84cc16 0px,#84cc16 4px,#ecfccb 4px,#ecfccb 8px)",
+];
+
+const EXPENSE_CATS = [
+  { key: "mileage" as const, label: "Mileage Cost" },
+  { key: "meals" as const, label: "Meals" },
+  { key: "lodging" as const, label: "Lodge" },
+  { key: "other" as const, label: "Other" },
+];
+
 interface TsRow { id: string; week_number: number; status: string; month?: number; year?: number; employee_notes?: string | null; manager_comments?: string | null; }
 interface ExRow { id: string; week_number: number; year: number; status: string; }
 
@@ -31,9 +66,11 @@ interface Props {
   realTimesheets: TsRow[];
   realExpenses: ExRow[];
   newExHref: string;
+  userRole?: "employee" | "manager" | "admin" | "finance";
+  userId?: string;
 }
 
-export function OverviewTabsCard({ year, month, week, realTimesheets, realExpenses, newExHref }: Props) {
+export function OverviewTabsCard({ year, month, week, realTimesheets, realExpenses, newExHref, userRole = "employee", userId }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("Timesheets");
   const [activeWeek, setActiveWeek] = useState<number>(week);
   const [selectedMonth, setSelectedMonth] = useState<number>(month);
@@ -44,61 +81,89 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
     if (now.getFullYear() === year && now.getMonth() + 1 === month) return now.getDate();
     return null;
   });
-  const [dayEntries, setDayEntries] = useState<Record<number, { billingType: string; project: string; hours: string; manager: string }>>({});
+  const [dayEntries, setDayEntries] = useState<Record<number, { billingType: string; project: string; hours: string; manager: string; mileage: string; meals: string; lodging: string; other: string }>>({});
   const [editingBilling, setEditingBilling] = useState(false);
+  const [editingLocation, setEditingLocation] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [monthNotes, setMonthNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [viewMode, setViewMode] = useState<"week" | "month">("week");
+  const [approvalComment, setApprovalComment] = useState("");
+  const [localTimesheets, setLocalTimesheets] = useState<TsRow[]>(realTimesheets);
+  const router = useRouter();
+  const supabase = createClient();
+  const isManager = userRole === "manager" || userRole === "admin" || userRole === "finance";
+
+  // Sync localTimesheets when server data changes
+  useEffect(() => { setLocalTimesheets(realTimesheets); }, [realTimesheets]);
+
+  // Track which month/year the current dayEntries + notes belong to
+  const activeKeyRef = useRef(`${selectedYear}-${selectedMonth}`);
 
   // Load from localStorage after hydration
   useEffect(() => {
+    const key = `${selectedYear}-${selectedMonth}`;
     try {
-      const key = `dayEntries-${selectedYear}-${selectedMonth}`;
-      const saved = localStorage.getItem(key);
+      const saved = localStorage.getItem(`dayEntries-${key}`);
       if (saved) setDayEntries(JSON.parse(saved));
     } catch {}
+    try {
+      const saved = localStorage.getItem(`monthNotes-${key}`);
+      setMonthNotes(saved ?? "");
+    } catch {}
+    activeKeyRef.current = key;
     setHydrated(true);
   }, []);
 
-  // Save entries to localStorage on change (only after hydration)
+  // Auto-save entries — always writes to the ref key (the month the data belongs to)
   useEffect(() => {
     if (!hydrated) return;
-    const key = `dayEntries-${selectedYear}-${selectedMonth}`;
-    localStorage.setItem(key, JSON.stringify(dayEntries));
-  }, [dayEntries, selectedYear, selectedMonth, hydrated]);
+    localStorage.setItem(`dayEntries-${activeKeyRef.current}`, JSON.stringify(dayEntries));
+  }, [dayEntries, hydrated]);
 
-  // Reload entries when month/year changes
+  // Auto-save notes — always writes to the ref key
   useEffect(() => {
     if (!hydrated) return;
+    localStorage.setItem(`monthNotes-${activeKeyRef.current}`, monthNotes);
+  }, [monthNotes, hydrated]);
+
+  // Switch month/year: save current data first, then load the new month
+  function switchPeriod(newMonth: number, newYear: number) {
+    if (hydrated) {
+      // Flush current data to the OLD key before switching
+      localStorage.setItem(`dayEntries-${activeKeyRef.current}`, JSON.stringify(dayEntries));
+      localStorage.setItem(`monthNotes-${activeKeyRef.current}`, monthNotes);
+    }
+    const newKey = `${newYear}-${newMonth}`;
+    // Load new month's data
+    let loadedEntries = {};
+    let loadedNotes = "";
     try {
-      const key = `dayEntries-${selectedYear}-${selectedMonth}`;
-      const saved = localStorage.getItem(key);
-      setDayEntries(saved ? JSON.parse(saved) : {});
-    } catch { setDayEntries({}); }
-  }, [selectedYear, selectedMonth, hydrated]);
+      const saved = localStorage.getItem(`dayEntries-${newKey}`);
+      loadedEntries = saved ? JSON.parse(saved) : {};
+    } catch {}
+    try {
+      const saved = localStorage.getItem(`monthNotes-${newKey}`);
+      loadedNotes = saved ?? "";
+    } catch {}
+    // Update ref BEFORE setting state so auto-save targets the new key
+    activeKeyRef.current = newKey;
+    setDayEntries(loadedEntries);
+    setMonthNotes(loadedNotes);
+    setSelectedMonth(newMonth);
+    setSelectedYear(newYear);
+    setActiveWeek(1);
+    setSelectedDay(null);
+  }
 
   // Derive selectedTs early so notes can sync
-  const monthTs     = realTimesheets.filter(t => t.year === selectedYear && t.month === selectedMonth);
+  const monthTs     = localTimesheets.filter(t => t.year === selectedYear && t.month === selectedMonth);
   const selectedTs  = monthTs.find(t => t.week_number === activeWeek);
 
-  // Load/save month-level notes from localStorage
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      const key = `monthNotes-${selectedYear}-${selectedMonth}`;
-      const saved = localStorage.getItem(key);
-      setMonthNotes(saved ?? "");
-    } catch { setMonthNotes(""); }
-  }, [selectedYear, selectedMonth, hydrated]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    const key = `monthNotes-${selectedYear}-${selectedMonth}`;
-    localStorage.setItem(key, monthNotes);
-  }, [monthNotes, selectedYear, selectedMonth, hydrated]);
-
-  const emptyEntry = { billingType: "", project: "", hours: "", manager: "" };
+  const emptyEntry = { billingType: "", project: "", hours: "", manager: "", mileage: "", meals: "", lodging: "", other: "" };
   const curEntry = selectedDay != null ? (dayEntries[selectedDay] ?? emptyEntry) : null;
-  function updateEntry(field: "billingType" | "project" | "hours" | "manager", value: string) {
+  function updateEntry(field: "billingType" | "project" | "hours" | "manager" | "mileage" | "meals" | "lodging" | "other", value: string) {
     if (selectedDay == null) return;
     setDayEntries(prev => ({
       ...prev,
@@ -123,29 +188,139 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
   let statusLabel = "Upcoming";
   let statusDot   = "bg-gray-300";
   let statusCls   = "text-gray-400";
-  let panelBg     = "bg-gray-20";
-  let panelBorder = "border-gray-50";
 
-  if (selectedTs?.status === "approved")              { statusLabel = "Approved";         statusDot = "bg-emerald-500"; statusCls = "text-emerald-700"; panelBg = "bg-emerald-50";  panelBorder = "border-emerald-100"; }
-  else if (selectedTs?.status === "manager_approved") { statusLabel = "Mgr Approved";     statusDot = "bg-blue-500";    statusCls = "text-blue-700";    panelBg = "bg-blue-50";     panelBorder = "border-blue-100"; }
-  else if (selectedTs?.status === "submitted")        { statusLabel = "Pending";          statusDot = "bg-amber-400";   statusCls = "text-amber-600";   panelBg = "bg-amber-50";    panelBorder = "border-amber-100"; }
-  else if (selectedTs?.status === "manager_rejected") { statusLabel = "Mgr Rejected";     statusDot = "bg-orange-400";  statusCls = "text-orange-600";  panelBg = "bg-orange-50";   panelBorder = "border-orange-100"; }
-  else if (selectedTs?.status === "rejected")         { statusLabel = "Rejected";         statusDot = "bg-red-400";     statusCls = "text-red-600";     panelBg = "bg-red-50";      panelBorder = "border-red-100"; }
-  else if (selectedTs?.status === "draft")            { statusLabel = "Draft";            statusDot = "bg-primary/50";  statusCls = "text-primary";     panelBg = "bg-primary/5";   panelBorder = "border-primary/10"; }
-  else if (isCurrentWeek)                             { statusLabel = "In Progress";      statusDot = "bg-primary/50";  statusCls = "text-primary";     panelBg = "bg-primary/5";   panelBorder = "border-primary/10"; }
-  else if (!isFutureWeek)                             { statusLabel = "Missing";          statusDot = "bg-red-300";     statusCls = "text-red-500";     panelBg = "bg-red-50";      panelBorder = "border-red-100"; }
+  if (selectedTs?.status === "approved")              { statusLabel = "Approved";         statusDot = "bg-emerald-500"; statusCls = "text-emerald-700"; }
+  else if (selectedTs?.status === "manager_approved") { statusLabel = "Mgr Approved";     statusDot = "bg-blue-500";    statusCls = "text-blue-700"; }
+  else if (selectedTs?.status === "submitted")        { statusLabel = "Pending";          statusDot = "bg-amber-400";   statusCls = "text-amber-600"; }
+  else if (selectedTs?.status === "manager_rejected") { statusLabel = "Mgr Rejected";     statusDot = "bg-orange-400";  statusCls = "text-orange-600"; }
+  else if (selectedTs?.status === "rejected")         { statusLabel = "Rejected";         statusDot = "bg-red-400";     statusCls = "text-red-600"; }
+  else if (selectedTs?.status === "draft")            { statusLabel = "Draft";            statusDot = "bg-primary/50";  statusCls = "text-primary"; }
+  else if (isCurrentWeek)                             { statusLabel = "In Progress";      statusDot = "bg-primary/50";  statusCls = "text-primary"; }
+  else if (!isFutureWeek)                             { statusLabel = "Missing";          statusDot = "bg-red-300";     statusCls = "text-red-500"; }
 
-  const tsHref = selectedTs?.id
-    ? `/timesheets/${selectedTs.id}`
-    : `/timesheets/new?year=${selectedYear}&month=${selectedMonth}&week=${activeWeek}`;
+  // ── Month-level record (week_number=0) for submit/approve ───────────────────
+  const monthRecord = monthTs.find(t => t.week_number === 0);
+  const monthSubmitted = monthRecord && ["submitted", "approved", "manager_approved"].includes(monthRecord.status);
+  const monthRejected = monthRecord && ["rejected", "manager_rejected"].includes(monthRecord.status);
+
+  // ── Submit / Approve / Reject handlers (month-level) ──────────────────────
+  async function handleSubmitMonth() {
+    if (!userId || submitting) return;
+    setSubmitting(true);
+    try {
+      // Look up the employee's manager
+      const { data: emRow }: any = await (supabase as any)
+        .from("employee_manager")
+        .select("manager_id")
+        .eq("employee_id", userId)
+        .maybeSingle();
+      const managerId = emRow?.manager_id ?? null;
+
+      const { data: existing }: any = await (supabase as any)
+        .from("timesheets")
+        .select("id")
+        .eq("employee_id", userId)
+        .eq("year", selectedYear)
+        .eq("month", selectedMonth)
+        .eq("week_number", 0)
+        .maybeSingle();
+
+      const now = new Date().toISOString();
+
+      if (existing?.id) {
+        await (supabase as any).from("timesheets").update({
+          status: "submitted",
+          employee_notes: monthNotes || null,
+          manager_id: managerId,
+          submitted_at: now,
+        }).eq("id", existing.id);
+      } else {
+        await (supabase as any).from("timesheets").insert({
+          employee_id: userId,
+          year: selectedYear,
+          month: selectedMonth,
+          week_number: 0,
+          status: "submitted",
+          employee_notes: monthNotes || null,
+          manager_id: managerId,
+          submitted_at: now,
+        });
+      }
+
+      setLocalTimesheets(prev => {
+        const idx = prev.findIndex(t => t.year === selectedYear && t.month === selectedMonth && t.week_number === 0);
+        if (idx >= 0) {
+          const updated = [...prev];
+          updated[idx] = { ...updated[idx], status: "submitted", employee_notes: monthNotes || null };
+          return updated;
+        }
+        return [...prev, { id: "temp-" + Date.now(), year: selectedYear, month: selectedMonth, week_number: 0, status: "submitted", employee_notes: monthNotes || null, manager_comments: null }];
+      });
+      router.refresh();
+    } catch (err) {
+      console.error("Submit failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRecallMonth() {
+    if (!monthRecord?.id || submitting) return;
+    setSubmitting(true);
+    try {
+      await (supabase as any).from("timesheets").update({
+        status: "draft",
+        submitted_at: null,
+      }).eq("id", monthRecord.id);
+
+      setLocalTimesheets(prev =>
+        prev.map(t => t.id === monthRecord.id ? { ...t, status: "draft" } : t)
+      );
+      router.refresh();
+    } catch (err) {
+      console.error("Recall failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleApproval(action: "approved" | "rejected") {
+    if (!monthRecord?.id || submitting) return;
+    setSubmitting(true);
+    try {
+      await (supabase as any).from("timesheets").update({
+        status: action,
+        manager_comments: approvalComment || null,
+      }).eq("id", monthRecord.id);
+
+      setLocalTimesheets(prev =>
+        prev.map(t => t.id === monthRecord.id ? { ...t, status: action, manager_comments: approvalComment || null } : t)
+      );
+      setApprovalComment("");
+      router.refresh();
+    } catch (err) {
+      console.error("Approval action failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Load approval comment from month record
+  useEffect(() => {
+    if (isManager && monthRecord?.manager_comments) {
+      setApprovalComment(monthRecord.manager_comments);
+    } else {
+      setApprovalComment("");
+    }
+  }, [monthRecord?.id]);
 
   return (
     <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-4">
-      {/* Header — Month / Year / Manager dropdowns */}
-      <div className="flex items-center gap-4 mb-3">
+      {/* Header — Month / Year / Manager dropdowns + Week/Month toggle */}
+      <div className="flex items-center gap-4 mb-3 flex-wrap">
         <select
           value={selectedMonth}
-          onChange={e => { setSelectedMonth(Number(e.target.value)); setActiveWeek(1); setSelectedDay(null); }}
+          onChange={e => switchPeriod(Number(e.target.value), selectedYear)}
           className="select-chevron rounded-lg border border-gray-200 bg-white pl-3 pr-10 py-1.5 text-sm font-bold text-gray-800 cursor-pointer focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
         >
           {MONTH_NAMES.slice(1).map((m, i) => (
@@ -154,7 +329,7 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
         </select>
         <select
           value={selectedYear}
-          onChange={e => { setSelectedYear(Number(e.target.value)); setActiveWeek(1); setSelectedDay(null); }}
+          onChange={e => switchPeriod(selectedMonth, Number(e.target.value))}
           className="select-chevron rounded-lg border border-gray-200 bg-white pl-3 pr-10 py-1.5 text-sm font-bold text-gray-800 cursor-pointer focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
         >
           {[year - 1, year, year + 1].map(y => (
@@ -170,6 +345,23 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
           >
             <option value="">Select…</option>
           </select>
+        </div>
+        <div className="flex-1" />
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+          <button
+            type="button"
+            onClick={() => setViewMode("week")}
+            className={`px-3 py-1.5 text-[12px] font-semibold transition-colors ${viewMode === "week" ? "bg-primary text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+          >
+            Week
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("month")}
+            className={`px-3 py-1.5 text-[12px] font-semibold transition-colors ${viewMode === "month" ? "bg-primary text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
+          >
+            Month
+          </button>
         </div>
       </div>
 
@@ -190,10 +382,10 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
       </div>
 
       {/* ── Timesheets content ── */}
-      <div className="flex gap-2">
-
-          {/* Left: vertical week tabs */}
-          <div className="flex flex-col gap-1 shrink-0">
+      {viewMode === "week" && (
+      <div>
+          {/* Horizontal week tabs */}
+          <div className="flex gap-1 mb-2">
             {Array.from({ length: numWeeks }, (_, i) => {
               const w    = i + 1;
               const ts   = monthTs.find(t => t.week_number === w);
@@ -216,37 +408,34 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
                 <button
                   key={w}
                   onClick={() => setActiveWeek(w)}
-                  className={`flex flex-col items-center gap-1 px-2 py-3.5 rounded-xl text-[11px] font-bold transition-all w-16 ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-bold transition-all flex-1 justify-center ${
                     isActive
                       ? "bg-primary text-white shadow-md"
                       : isCurr
-                      ? "bg-white text-gray shadow-md hover:bg-primary/20"
-                      : "bg-white text-gray shadow-md hover:bg-gray-100"
+                      ? "bg-white text-gray-700 shadow-sm hover:bg-primary/10 border border-primary/20"
+                      : "bg-white text-gray-500 shadow-sm hover:bg-gray-50 border border-gray-100"
                   }`}
                 >
-                  <span>W{w}</span>
+                  <span>Week {w}</span>
                   <div className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? "bg-white/70" : dot}`}/>
                 </button>
               );
             })}
           </div>
 
-          {/* Right: selected week detail panel */}
-          <div className={`flex-1 rounded-xl border p-4 flex flex-col gap-3 ${panelBg} ${panelBorder}`}>
-            {/* Week info + total hours */}
+          {/* Selected week detail panel */}
+          <div className="rounded-xl border border-primary/10 bg-primary/5 p-4 flex flex-col gap-3">
+            {/* Total hours */}
             {(() => {
               const totalWeekHours = Array.from({ length: endDay - startDay + 1 }, (_, i) => {
                 const d = startDay + i;
                 return parseFloat(dayEntries[d]?.hours || "0") || 0;
               }).reduce((sum, h) => sum + h, 0);
               return (
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[15px] font-bold text-gray-500 uppercase tracking-wider">Week {activeWeek}</p>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[15px] font-semibold text-gray-900 uppercase">Total</span>
-                    <span className="text-[22px] font-extrabold text-orange-500 leading-none">{totalWeekHours.toFixed(1)}</span>
-                    <span className="text-[14px] font-semibold text-gray-900">hrs</span>
-                  </div>
+                <div className="flex items-center justify-end gap-1.5">
+                  <span className="text-[15px] font-semibold text-gray-900 uppercase">Total</span>
+                  <span className="text-[22px] font-extrabold text-orange-500 leading-none">{totalWeekHours.toFixed(1)}</span>
+                  <span className="text-[14px] font-semibold text-gray-900">hrs</span>
                 </div>
               );
             })()}
@@ -270,27 +459,29 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
                     const isActualToday = d === todayDate;
                     const isToday = isActualToday && (selectedDay == null || selectedDay === d);
                     const isSelected = d != null && d === selectedDay;
+
                     return (
-                      <button
-                        key={i}
-                        type="button"
-                        disabled={d == null}
-                        onClick={() => d != null && setSelectedDay(d)}
-                        className={`flex-1 flex flex-col items-center justify-center rounded-lg border py-3.5 transition-colors ${
-                          d == null
-                            ? "border-dashed border-gray-200 opacity-30 cursor-default"
-                            : isSelected
-                            ? "border-primary bg-primary/20 text-gray"
-                            : isToday
-                            ? "border-primary bg-primary/10 cursor-pointer"
-                            : "border-gray-200 bg-white/60 cursor-pointer hover:border-gray-300"
-                        }`}
-                      >
-                        <span className={`text-[14px] font-semibold leading-none ${isSelected ? "text-gray/80" : isActualToday ? "text-primary" : "text-gray-80"}`}>{lbl}</span>
-                        <span className={`text-[20px] font-bold leading-tight mt-1 ${d == null ? "text-gray-300" : isSelected ? "text-gray" : isActualToday ? "text-primary" : "text-gray-700"}`}>
-                          {d ?? "—"}
-                        </span>
-                      </button>
+                      <div key={i} className="flex-1">
+                        <button
+                          type="button"
+                          disabled={d == null}
+                          onClick={() => { if (d != null) { setSelectedDay(d); setEditingBilling(false); setEditingLocation(false); } }}
+                          className={`w-full flex flex-col items-center justify-center rounded-lg border py-3.5 transition-colors ${
+                            d == null
+                              ? "border-dashed border-gray-200 opacity-30 cursor-default"
+                              : isSelected
+                              ? "border-primary bg-primary/20 text-gray"
+                              : isToday
+                              ? "border-primary bg-primary/10 cursor-pointer"
+                              : "border-gray-200 bg-white/60 cursor-pointer hover:border-gray-300"
+                          }`}
+                        >
+                          <span className={`text-[14px] font-semibold leading-none ${isSelected ? "text-gray/80" : isActualToday ? "text-primary" : "text-gray-80"}`}>{lbl}</span>
+                          <span className={`text-[20px] font-bold leading-tight mt-1 ${d == null ? "text-gray-300" : isSelected ? "text-gray" : isActualToday ? "text-primary" : "text-gray-700"}`}>
+                            {d ?? "—"}
+                          </span>
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -332,10 +523,20 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
               }
               const maxRow = Math.max(0, ...Object.values(rowAssign));
               const rowHeight = 40;
-              const gridHeight = Math.max(160, (maxRow + 1) * rowHeight + 80);
+              // Check if any day has expense data — need extra height for expense bars below pills
+              let hasAnyExpense = false;
+              for (let d = startDay; d <= endDay; d++) {
+                const ex = dayEntries[d];
+                if (ex) {
+                  const et = (parseFloat(ex.mileage || "0") || 0) + (parseFloat(ex.meals || "0") || 0) + (parseFloat(ex.lodging || "0") || 0) + (parseFloat(ex.other || "0") || 0);
+                  if (et > 0) { hasAnyExpense = true; break; }
+                }
+              }
+              const expenseExtra = hasAnyExpense ? 30 : 0;
+              const gridHeight = Math.max(160, (maxRow + 1) * rowHeight + 80 + expenseExtra);
 
               return (
-                <div className="relative mt-4" style={{ height: gridHeight }}>
+                <div className="relative mt-2" style={{ height: gridHeight }}>
                   {/* Day entry buttons */}
                   {filledDays.map(({ day, dow, isSelected }) => {
                     const centerPct = ((dow + 0.5) / 7) * 100;
@@ -367,23 +568,41 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
                           <span className={`text-[14px] font-bold ${isSelected ? "text-orange-400" : "text-orange-400"}`}>hrs</span>
                         </div>
                         <div className="flex flex-col">
-                          {isSelected ? (
-                            <input
-                              type="text"
-                              value={entry.project}
-                              onChange={e => updateEntry("project", e.target.value)}
-                              placeholder="Location"
-                              size={Math.max((entry.project || "Location").length, 5)}
-                              className="text-[13px] leading-tight font-semibold text-white bg-transparent border-none outline-none placeholder:text-gray-400 cursor-text p-0 m-0 whitespace-nowrap w-auto"
-                            />
-                          ) : (
-                            <span className="text-[13px] leading-tight font-semibold text-white whitespace-nowrap">{entry.project || "Location"}</span>
-                          )}
+                          <div className="relative">
+                            {isSelected ? (
+                              <>
+                                <button
+                                  onClick={() => { setEditingLocation(!editingLocation); setEditingBilling(false); }}
+                                  className="text-[13px] leading-tight font-semibold text-white cursor-pointer whitespace-nowrap"
+                                >
+                                  {entry.project || "Location"}
+                                </button>
+                                {editingLocation && (
+                                  <>
+                                  <div className="fixed inset-0 z-40" onClick={() => setEditingLocation(false)} />
+                                  <div className="absolute bottom-full left-0 mb-1 z-50 bg-white rounded-xl border border-gray-200 shadow-lg py-1 min-w-[200px] max-h-[180px] overflow-y-auto">
+                                    {LOCATIONS.map(loc => (
+                                      <button
+                                        key={loc}
+                                        onClick={() => { updateEntry("project", loc); setEditingLocation(false); }}
+                                        className={`w-full text-left px-3 py-2 text-[13px] hover:bg-primary/10 transition-colors ${entry.project === loc ? "text-primary font-semibold bg-primary/5" : "text-gray-700"}`}
+                                      >
+                                        {loc}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-[13px] leading-tight font-semibold text-white whitespace-nowrap">{entry.project || "Location"}</span>
+                            )}
+                          </div>
                           <div className="relative -mt-0.5">
                             {isSelected ? (
                               <>
                                 <button
-                                  onClick={() => setEditingBilling(!editingBilling)}
+                                  onClick={() => { setEditingBilling(!editingBilling); setEditingLocation(false); }}
                                   className="text-[12px] leading-tight font-medium text-gray-300 cursor-pointer whitespace-nowrap"
                                 >
                                   {entry.billingType || "Billing Type"}
@@ -414,6 +633,57 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
                       </div>
                     );
                   })}
+                  {/* Expense bars on the grid — positioned below timesheet pills */}
+                  {(() => {
+                    const expDays: { day: number; dow: number; expTotal: number; expCats: { amount: number; idx: number }[] }[] = [];
+                    for (let d = startDay; d <= endDay; d++) {
+                      const exp = dayEntries[d] ?? emptyEntry;
+                      const amts = [
+                        parseFloat(exp.mileage || "0") || 0,
+                        parseFloat(exp.meals || "0") || 0,
+                        parseFloat(exp.lodging || "0") || 0,
+                        parseFloat(exp.other || "0") || 0,
+                      ];
+                      const total = amts[0] + amts[1] + amts[2] + amts[3];
+                      if (total > 0) {
+                        expDays.push({
+                          day: d,
+                          dow: new Date(selectedYear, selectedMonth - 1, d).getDay(),
+                          expTotal: total,
+                          expCats: amts.map((a, idx) => ({ amount: a, idx })).filter(c => c.amount > 0),
+                        });
+                      }
+                    }
+                    return expDays.map(({ day, dow, expTotal, expCats: eCats }) => {
+                      const centerPct = ((dow + 0.5) / 7) * 100;
+                      const tsRow = rowAssign[dow] ?? 0;
+                      const topPx = 4 + tsRow * rowHeight + 36; // below the timesheet pill
+                      return (
+                        <div
+                          key={`exp-${day}`}
+                          className="absolute z-[4] flex flex-col items-center"
+                          style={{ left: `${centerPct}%`, transform: "translateX(-50%)", top: `${topPx}px`, width: 60 }}
+                        >
+                          <p className="text-[8px] font-bold text-gray-500 text-center leading-none mb-0.5">${expTotal.toFixed(0)}</p>
+                          <div className="flex gap-px rounded overflow-hidden w-full" style={{ height: 6 }}>
+                            {eCats.map((c, ci) => (
+                              <div
+                                key={c.idx}
+                                style={{
+                                  flex: c.amount,
+                                  background: EXPENSE_STRIPES[c.idx],
+                                  borderRadius: ci === 0 && ci === eCats.length - 1 ? "3px"
+                                    : ci === 0 ? "3px 1px 1px 3px"
+                                    : ci === eCats.length - 1 ? "1px 3px 3px 1px"
+                                    : "1px",
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
               {/* 7 vertical dotted lines aligned under each day */}
               <div className="absolute inset-0 flex gap-1">
                 {Array.from({ length: 7 }).map((_, col) => (
@@ -433,20 +703,285 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
             </div>
               );
             })()}
+            {/* ── Daily Expense Input — dashboard card style ── */}
+            {selectedDay != null && (() => {
+              const exp = dayEntries[selectedDay] ?? emptyEntry;
+              const amts = [
+                parseFloat(exp.mileage || "0") || 0,
+                parseFloat(exp.meals || "0") || 0,
+                parseFloat(exp.lodging || "0") || 0,
+                parseFloat(exp.other || "0") || 0,
+              ];
+              const total = amts[0] + amts[1] + amts[2] + amts[3];
+              const cats = amts.map((a, idx) => ({ amount: a, idx, ...EXPENSE_CATS[idx] })).filter(c => c.amount > 0);
+
+              return (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 pt-3 pb-3 mt-4">
+                  {/* Header: label + total */}
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex flex-col">
+                      <span className="text-[15px] font-semibold text-gray-700">Expense</span>
+                      <span className="text-[11px] text-gray-400 font-medium">
+                        {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(selectedYear, selectedMonth - 1, selectedDay).getDay()]}, {MONTH_NAMES[selectedMonth].slice(0,3)} {selectedDay}
+                      </span>
+                    </div>
+                    <span className="text-[32px] font-extrabold text-gray-900 leading-none tracking-tight">
+                      ${total.toFixed(0)}
+                    </span>
+                  </div>
+
+                  {/* Category inputs */}
+                  <div className="grid grid-cols-4 gap-2 mb-2">
+                    {EXPENSE_CATS.map((cat, idx) => (
+                      <div key={cat.key}>
+                        <label className="text-[10px] font-medium text-gray-500 leading-none">{cat.label}</label>
+                        <div className="relative mt-0.5">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-400 pointer-events-none">$</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={exp[cat.key] ?? ""}
+                            onChange={e => updateEntry(cat.key, e.target.value)}
+                            placeholder="0"
+                            className="w-full pl-5 pr-1 py-1.5 text-[13px] font-semibold text-gray-800 bg-gray-50 border border-gray-200 rounded-lg text-right outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Proportional stripe bars — labels + bars */}
+                  {total > 0 && (
+                    <>
+                      <div className="flex gap-1 mb-1">
+                        {cats.map((c) => (
+                          <div key={c.key} style={{ flex: c.amount, minWidth: 0 }}>
+                            <p className="text-[10px] font-medium text-gray-600 truncate">
+                              {c.label} ${c.amount.toFixed(0)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-1">
+                        {cats.map((c, ci) => {
+                          const isFirst = ci === 0;
+                          const isLast = ci === cats.length - 1;
+                          return (
+                            <div
+                              key={c.key}
+                              style={{
+                                flex: c.amount,
+                                height: "44px",
+                                background: EXPENSE_STRIPES[c.idx],
+                                borderRadius: isFirst && isLast ? "10px"
+                                  : isFirst ? "10px 4px 4px 10px"
+                                  : isLast ? "4px 10px 10px 4px"
+                                  : "4px",
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
             </div>{/* end calendar + form area */}
 
           </div>
 
         </div>
+      )}
 
-      {/* ── Month-level: Notes, Approval Comments, Submit ── */}
+      {/* ── Month Summary Table ── */}
+      <div className={viewMode === "month" ? "" : "mt-4 border-t border-gray-100 pt-4"}>
+        {viewMode === "week" ? (
+        <button
+          type="button"
+          onClick={() => setShowSummary(prev => !prev)}
+          className="w-full flex items-center justify-between mb-2 group cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showSummary ? "rotate-90" : ""}`} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd"/>
+            </svg>
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider group-hover:text-gray-700 transition-colors">
+              {MONTH_NAMES[selectedMonth]} {selectedYear} — Timesheet Summary
+            </span>
+          </div>
+          {monthRecord && (
+            <div className="flex items-center gap-1.5">
+              <div className={`w-2 h-2 rounded-full ${
+                monthRecord.status === "approved" ? "bg-emerald-500"
+                : monthRecord.status === "manager_approved" ? "bg-blue-500"
+                : monthRecord.status === "submitted" ? "bg-amber-400"
+                : monthRecord.status === "rejected" || monthRecord.status === "manager_rejected" ? "bg-red-400"
+                : "bg-gray-300"
+              }`} />
+              <span className={`text-[11px] font-semibold ${
+                monthRecord.status === "approved" ? "text-emerald-700"
+                : monthRecord.status === "manager_approved" ? "text-blue-700"
+                : monthRecord.status === "submitted" ? "text-amber-600"
+                : monthRecord.status === "rejected" || monthRecord.status === "manager_rejected" ? "text-red-600"
+                : "text-gray-400"
+              }`}>
+                {monthRecord.status === "approved" ? "Approved"
+                  : monthRecord.status === "manager_approved" ? "Mgr Approved"
+                  : monthRecord.status === "submitted" ? "Pending Approval"
+                  : monthRecord.status === "rejected" ? "Rejected"
+                  : monthRecord.status === "manager_rejected" ? "Mgr Rejected"
+                  : "Draft"}
+              </span>
+            </div>
+          )}
+        </button>
+        ) : (
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              {MONTH_NAMES[selectedMonth]} {selectedYear} — Timesheet Summary
+            </span>
+            {monthRecord && (
+              <div className="flex items-center gap-1.5">
+                <div className={`w-2 h-2 rounded-full ${
+                  monthRecord.status === "approved" ? "bg-emerald-500"
+                  : monthRecord.status === "manager_approved" ? "bg-blue-500"
+                  : monthRecord.status === "submitted" ? "bg-amber-400"
+                  : monthRecord.status === "rejected" || monthRecord.status === "manager_rejected" ? "bg-red-400"
+                  : "bg-gray-300"
+                }`} />
+                <span className={`text-[11px] font-semibold ${
+                  monthRecord.status === "approved" ? "text-emerald-700"
+                  : monthRecord.status === "manager_approved" ? "text-blue-700"
+                  : monthRecord.status === "submitted" ? "text-amber-600"
+                  : monthRecord.status === "rejected" || monthRecord.status === "manager_rejected" ? "text-red-600"
+                  : "text-gray-400"
+                }`}>
+                  {monthRecord.status === "approved" ? "Approved"
+                    : monthRecord.status === "manager_approved" ? "Mgr Approved"
+                    : monthRecord.status === "submitted" ? "Pending Approval"
+                    : monthRecord.status === "rejected" ? "Rejected"
+                    : monthRecord.status === "manager_rejected" ? "Mgr Rejected"
+                    : "Draft"}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {(viewMode === "month" || showSummary) && (
+
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <table className="w-full text-[11px] border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-500 uppercase w-10 border-r border-gray-200">Wk</th>
+                {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+                  <th key={d} className="px-1.5 py-1.5 text-center font-semibold text-gray-500 uppercase border-r border-gray-100 min-w-[72px]">{d}</th>
+                ))}
+                <th className="px-2 py-1.5 text-center font-semibold text-gray-500 uppercase bg-gray-100 min-w-[48px]">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                const rows: React.ReactNode[] = [];
+                let monthTotal = 0;
+
+                for (let w = 1; w <= numWeeks; w++) {
+                  const wStart = (w - 1) * 7 + 1;
+                  const wEnd = Math.min(w * 7, daysInMonth);
+                  let weekTotal = 0;
+
+                  // Map each day of this week to its day-of-week slot (0=Sun..6=Sat)
+                  const slots: (number | null)[] = [null, null, null, null, null, null, null];
+                  for (let d = wStart; d <= wEnd; d++) {
+                    const dow = new Date(selectedYear, selectedMonth - 1, d).getDay();
+                    slots[dow] = d;
+                  }
+
+                  // Compute week total
+                  for (let d = wStart; d <= wEnd; d++) {
+                    weekTotal += parseFloat(dayEntries[d]?.hours || "0") || 0;
+                  }
+                  monthTotal += weekTotal;
+
+                  rows.push(
+                    <tr key={`w-${w}`} className="border-b border-gray-200">
+                      <td className="px-2 py-1 align-top text-center font-bold text-gray-400 border-r border-gray-200 bg-gray-50/50">
+                        {w}
+                      </td>
+                      {slots.map((d, col) => {
+                        if (d == null) {
+                          return <td key={col} className="px-1 py-1 border-r border-gray-100 bg-gray-50/30" />;
+                        }
+                        const entry = dayEntries[d];
+                        const hrs = parseFloat(entry?.hours || "0") || 0;
+                        const isWeekend = col === 0 || col === 6;
+                        return (
+                          <td key={col} className={`px-1.5 py-1 align-top border-r border-gray-100 ${isWeekend ? "bg-gray-50/50" : ""}`}>
+                            <div className="flex flex-col gap-0">
+                              <span className="text-[10px] text-gray-400 leading-none">{d}</span>
+                              <span className={`text-[13px] font-bold leading-tight tabular-nums ${hrs > 0 ? "text-orange-600" : "text-gray-200"}`}>
+                                {hrs > 0 ? hrs.toFixed(1) : "—"}
+                              </span>
+                              {hrs > 0 && (
+                                <>
+                                  <span className="text-[9px] text-gray-500 leading-tight truncate" title={entry?.project}>{entry?.project || "—"}</span>
+                                  <span className="text-[9px] text-gray-400 leading-tight truncate" title={entry?.billingType}>{entry?.billingType || "—"}</span>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
+                      <td className="px-2 py-1 align-top text-center bg-gray-50 font-bold text-gray-800 tabular-nums text-[13px]">
+                        {weekTotal > 0 ? weekTotal.toFixed(1) : "—"}
+                      </td>
+                    </tr>
+                  );
+                }
+
+                rows.push(
+                  <tr key="mt" className="bg-primary/5 border-t-2 border-primary/20">
+                    <td className="px-2 py-1.5 font-bold text-gray-900 uppercase text-[10px] border-r border-gray-200">Tot</td>
+                    {Array.from({ length: 7 }, (_, col) => {
+                      let dayTotal = 0;
+                      for (let w = 1; w <= numWeeks; w++) {
+                        for (let d = (w - 1) * 7 + 1; d <= Math.min(w * 7, daysInMonth); d++) {
+                          if (new Date(selectedYear, selectedMonth - 1, d).getDay() === col) {
+                            dayTotal += parseFloat(dayEntries[d]?.hours || "0") || 0;
+                          }
+                        }
+                      }
+                      return (
+                        <td key={col} className="px-1.5 py-1.5 text-center font-bold text-gray-600 tabular-nums text-[11px] border-r border-gray-100">
+                          {dayTotal > 0 ? dayTotal.toFixed(1) : "—"}
+                        </td>
+                      );
+                    })}
+                    <td className="px-2 py-1.5 text-center font-extrabold text-primary tabular-nums text-sm bg-primary/10">
+                      {monthTotal.toFixed(1)}
+                    </td>
+                  </tr>
+                );
+
+                return rows;
+              })()}
+            </tbody>
+          </table>
+        </div>
+        )}
+      </div>
+
+      {/* ── Notes, Approval Comments, Submit (month-level) ── */}
       <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
-        {/* Employee notes for the month */}
+        {/* Employee notes */}
         <div>
           <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
             Notes — {MONTH_NAMES[selectedMonth]} {selectedYear}
           </label>
-          {monthTs.length > 0 && monthTs.every(t => t.status !== "draft" && t.status !== "rejected" && t.status !== "manager_rejected") ? (
+          {monthSubmitted && !isManager ? (
             <p className="mt-1 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-2.5 min-h-[2.5rem]">
               {monthNotes || "No notes added."}
             </p>
@@ -460,58 +995,101 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
           )}
         </div>
 
-        {/* Approval comments — aggregated from all weeks with comments */}
-        {(() => {
-          const comments = monthTs.filter(t => t.manager_comments);
-          if (comments.length === 0) return null;
-          const hasRejection = comments.some(t => t.status === "rejected" || t.status === "manager_rejected");
-          return (
-            <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                Approval Comments
-              </label>
-              <div className={`mt-1 text-sm border rounded-lg p-2.5 space-y-2 ${
-                hasRejection ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
-              }`}>
-                {comments.map(t => (
-                  <div key={t.id} className="flex gap-2">
-                    <span className={`text-[11px] font-bold shrink-0 mt-0.5 ${
-                      t.status === "rejected" || t.status === "manager_rejected" ? "text-red-500" : "text-gray-400"
-                    }`}>
-                      W{t.week_number}:
-                    </span>
-                    <span className={hasRejection ? "text-red-700" : "text-gray-700"}>
-                      {t.manager_comments}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Submit for Approval — links to timesheets page for the month */}
-        {(() => {
-          const submittable = monthTs.filter(t => t.status === "draft" || t.status === "rejected" || t.status === "manager_rejected");
-          const hasNoTs = monthTs.length === 0;
-          if (submittable.length === 0 && !hasNoTs) return null;
-          const href = hasNoTs
-            ? `/timesheets/new?year=${selectedYear}&month=${selectedMonth}&week=1`
-            : submittable.length === 1
-            ? `/timesheets/${submittable[0].id}`
-            : `/timesheets`;
-          return (
-            <div className="flex justify-end">
-              <Link
-                href={href}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors shadow-sm"
+        {/* Approval comments — editable for managers, read-only for employees */}
+        {isManager && monthRecord && ["submitted", "manager_approved", "approved"].includes(monthRecord.status) ? (
+          <div>
+            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Approval Comments — {MONTH_NAMES[selectedMonth]} {selectedYear}
+            </label>
+            <textarea
+              value={approvalComment}
+              onChange={(e) => setApprovalComment(e.target.value)}
+              placeholder="Add comments for the employee…"
+              className="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm resize-none h-16 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => handleApproval("approved")}
+                disabled={submitting}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50"
               >
-                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
-                </svg>
-                Submit for Approval
-              </Link>
+                {submitting ? "Processing…" : "Approve Month"}
+              </button>
+              <button
+                onClick={() => handleApproval("rejected")}
+                disabled={submitting}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {submitting ? "Processing…" : "Reject"}
+              </button>
             </div>
+          </div>
+        ) : monthRecord?.manager_comments ? (
+          <div>
+            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Approval Comments
+            </label>
+            <div className={`mt-1 text-sm border rounded-lg p-2.5 ${
+              monthRejected ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
+            }`}>
+              <span className={monthRejected ? "text-red-700" : "text-gray-700"}>
+                {monthRecord.manager_comments}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Submit for Approval — month-level, all users */}
+        {userId && (() => {
+          if (monthSubmitted) {
+            return (
+              <div className={`flex items-center gap-2 rounded-xl px-4 py-2.5 ${
+                monthRecord?.status === "approved" ? "bg-emerald-50 border border-emerald-100"
+                : monthRecord?.status === "manager_approved" ? "bg-blue-50 border border-blue-100"
+                : "bg-amber-50 border border-amber-100"
+              }`}>
+                <div className={`w-2 h-2 rounded-full ${
+                  monthRecord?.status === "approved" ? "bg-emerald-500"
+                  : monthRecord?.status === "manager_approved" ? "bg-blue-500"
+                  : "bg-amber-400"
+                }`} />
+                <span className={`text-sm font-medium flex-1 ${
+                  monthRecord?.status === "approved" ? "text-emerald-700"
+                  : monthRecord?.status === "manager_approved" ? "text-blue-700"
+                  : "text-amber-700"
+                }`}>
+                  {MONTH_NAMES[selectedMonth]} {selectedYear} — {
+                    monthRecord?.status === "approved" ? "Approved"
+                    : monthRecord?.status === "manager_approved" ? "Manager Approved"
+                    : "Submitted for Approval"
+                  }
+                </span>
+                {monthRecord?.status === "submitted" && (
+                  <button
+                    onClick={handleRecallMonth}
+                    disabled={submitting}
+                    className="text-[12px] font-semibold text-amber-700 hover:text-amber-900 border border-amber-300 rounded-lg px-2.5 py-1 hover:bg-amber-100 transition-colors disabled:opacity-50 shrink-0"
+                  >
+                    {submitting ? "Recalling…" : "Recall"}
+                  </button>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <button
+              onClick={handleSubmitMonth}
+              disabled={submitting}
+              className="w-full flex items-center justify-center gap-2 bg-primary text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting
+                ? "Submitting…"
+                : monthRejected
+                ? `Resubmit ${MONTH_NAMES[selectedMonth]} for Approval`
+                : `Submit ${MONTH_NAMES[selectedMonth]} for Approval`
+              }
+            </button>
           );
         })()}
       </div>

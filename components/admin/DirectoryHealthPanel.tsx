@@ -73,11 +73,16 @@ export function DirectoryHealthPanel({
     setAutoManaging(true);
     try {
       const token = await getToken();
-      const res = await fetch("/.netlify/functions/admin-auto-manager-roles?keepAdminAsManager=true", {
+      const res = await fetch("/api/admin/auto-manager-roles?keepAdminAsManager=true", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const result = await res.json();
+      let result: any;
+      try {
+        result = await res.json();
+      } catch {
+        throw new Error(`Auto-manager endpoint returned non-JSON response (HTTP ${res.status}).`);
+      }
       if (!result.ok) throw new Error(result.error);
       toast({
         title: "Manager roles updated",
@@ -96,11 +101,16 @@ export function DirectoryHealthPanel({
     setRerouting(override ? "override" : "missing");
     try {
       const token = await getToken();
-      const res = await fetch(`/.netlify/functions/admin-reroute-submitted-approvals?override=${override}`, {
+      const res = await fetch(`/api/admin/reroute-submitted-approvals?override=${override}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const result = await res.json();
+      let result: any;
+      try {
+        result = await res.json();
+      } catch {
+        throw new Error(`Reroute endpoint returned non-JSON response (HTTP ${res.status}).`);
+      }
       if (!result.ok) throw new Error(result.error);
       toast({
         title: "Approvals re-routed",
