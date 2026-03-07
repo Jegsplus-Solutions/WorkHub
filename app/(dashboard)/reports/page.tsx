@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, getCurrentUserRole } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { TopBar } from "@/components/layout/TopBar";
 import { formatCurrency } from "@/lib/utils";
@@ -12,44 +12,51 @@ export default async function ReportsPage() {
 
   if (!user) redirect("/login");
 
-  const { data: profile }: any = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role === "employee") redirect("/dashboard");
+  const role = await getCurrentUserRole();
+  if (role === "employee") redirect("/dashboard");
 
   const currentYear = new Date().getFullYear();
 
-  const [tsStats, exStats]: any[] = await Promise.all([
+  const [tsResult, exResult]: any[] = await Promise.all([
     supabase
-      .from("timesheet_weeks" as any)
-      .select("status, total_hours, year, week_number")
+      .from("timesheets")
+      .select("id, status, year, week_number, timesheet_rows(weekly_total)")
       .eq("year", currentYear),
     supabase
-      .from("expense_weeks" as any)
-      .select("status, weekly_total, year, week_number")
+      .from("expense_reports")
+      .select("id, status, year, week_number, expense_entries(mileage_cost_claimed, lodging_amount, breakfast_amount, lunch_amount, dinner_amount, other_amount)")
       .eq("year", currentYear),
   ]);
 
-  const ts: any[] = tsStats.data ?? [];
-  const ex: any[] = exStats.data ?? [];
+  const ts: any[] = tsResult.data ?? [];
+  const ex: any[] = exResult.data ?? [];
 
   const tsSummary = {
     total: ts.length,
-    approved: ts.filter((t) => t.status === "approved").length,
+    approved: ts.filter((t) => t.status === "approved" || t.status === "manager_approved").length,
     pending: ts.filter((t) => t.status === "submitted").length,
-    totalHours: ts.reduce((s, t) => s + (t.total_hours || 0), 0),
+    totalHours: ts.reduce((s, t) => {
+      const hours = (t.timesheet_rows ?? []).reduce((h: number, r: any) => h + (r.weekly_total ?? 0), 0);
+      return s + hours;
+    }, 0),
   };
 
   const exSummary = {
     total: ex.length,
-    approved: ex.filter((e) => e.status === "approved").length,
+    approved: ex.filter((e) => e.status === "approved" || e.status === "manager_approved").length,
     pending: ex.filter((e) => e.status === "submitted").length,
     totalAmount: ex
       .filter((e) => e.status === "approved")
-      .reduce((s, e) => s + (e.weekly_total || 0), 0),
+      .reduce((s, e) => {
+        const total = (e.expense_entries ?? []).reduce(
+          (t: number, en: any) =>
+            t + (en.mileage_cost_claimed ?? 0) + (en.lodging_amount ?? 0) +
+            (en.breakfast_amount ?? 0) + (en.lunch_amount ?? 0) +
+            (en.dinner_amount ?? 0) + (en.other_amount ?? 0),
+          0
+        );
+        return s + total;
+      }, 0),
   };
 
   const stats = [

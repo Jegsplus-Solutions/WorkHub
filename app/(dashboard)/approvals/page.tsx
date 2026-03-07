@@ -30,8 +30,9 @@ export default async function ApprovalsPage() {
     supabase
       .from("timesheets")
       .select(`
-        id, year, month, week_number, total_hours, status, submitted_at,
-        employee:profiles!employee_id(id, display_name, email, department)
+        id, year, month, week_number, status, submitted_at,
+        employee:profiles!employee_id(id, display_name, email, department),
+        timesheet_rows(weekly_total)
       `)
       .in("status", exStatuses)
       .order("submitted_at"),
@@ -66,6 +67,7 @@ export default async function ApprovalsPage() {
   });
 
   const timesheets = (tsResult.data ?? []).map((t: any) => {
+    const totalHours = (t.timesheet_rows ?? []).reduce((s: number, r: any) => s + (r.weekly_total ?? 0), 0);
     const period = t.week_number === 0
       ? `${monthName(t.month)} ${t.year}`
       : `Week ${t.week_number}, ${monthName(t.month)} ${t.year}`;
@@ -74,7 +76,7 @@ export default async function ApprovalsPage() {
       type: "timesheet" as const,
       period,
       status: t.status,
-      amountLabel: `${(t.total_hours ?? 0).toFixed(1)} hrs`,
+      amountLabel: `${totalHours.toFixed(1)} hrs`,
       submittedAt: t.submitted_at,
       user: { id: t.employee?.id, display_name: t.employee?.display_name ?? "—", email: t.employee?.email ?? "", department: t.employee?.department },
       href: `/dashboard`,

@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, getCurrentUserRole } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { TopBar } from "@/components/layout/TopBar";
 import { LeaveRequestClient } from "@/components/leave/LeaveRequestClient";
@@ -12,6 +12,8 @@ export default async function NewLeavePage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const role = await getCurrentUserRole();
 
   // Manager for this employee
   const { data: managerRow }: any = await supabase
@@ -29,7 +31,7 @@ export default async function NewLeavePage() {
           userId={user.id}
           managerId={managerRow?.manager_id ?? null}
           status="draft"
-          userRole="employee"
+          userRole={role}
           initialData={{
             leaveType: "",
             startDate: "",

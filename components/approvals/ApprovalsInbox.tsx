@@ -54,7 +54,7 @@ export function ApprovalsInbox({ items: initialItems, managerId, userRole }: App
     }
   }
 
-  async function writeAuditLog(id: string, entityType: "timesheet" | "expense_report", action: string, comment?: string) {
+  async function writeAuditLog(id: string, entityType: "timesheet" | "expense_report" | "leave_request", action: string, comment?: string) {
     await (supabase.from as any)("audit_log").insert({
       actor_user_id: managerId,
       entity_type: entityType,

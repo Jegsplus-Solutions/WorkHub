@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, getCurrentUserRole } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { TopBar } from "@/components/layout/TopBar";
 import { LeaveRequestClient } from "@/components/leave/LeaveRequestClient";
@@ -18,26 +18,15 @@ export default async function LeaveDetailPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: lr }: any = await (supabase.from as any)("leave_requests")
+  const { data: lr }: any = await supabase
+    .from("leave_requests")
     .select("*")
     .eq("id", id)
     .single();
 
   if (!lr) notFound();
 
-  // Load current user role
-  const { data: rolesData }: any = await supabase
-    .from("user_roles" as any)
-    .select("role")
-    .eq("user_id", user.id);
-  const roles = (rolesData ?? []).map((r: any) => r.role);
-  const userRole = roles.includes("admin")
-    ? "admin"
-    : roles.includes("finance")
-      ? "finance"
-      : roles.includes("manager")
-        ? "manager"
-        : "employee";
+  const userRole = await getCurrentUserRole();
 
   return (
     <div className="flex flex-col h-full">

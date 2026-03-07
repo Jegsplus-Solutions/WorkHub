@@ -1,7 +1,7 @@
 // Hand-written types matching supabase/migrations/001_schema.sql
 // Run `npm run supabase:gen-types` to regenerate after schema changes.
 
-export type WorkStatus = "draft" | "submitted" | "approved" | "rejected";
+export type WorkStatus = "draft" | "submitted" | "manager_approved" | "manager_rejected" | "approved" | "rejected";
 export type AppRole = "employee" | "manager" | "finance" | "admin";
 export type AuditEntity =
   | "timesheet"
