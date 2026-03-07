@@ -101,6 +101,8 @@ export function ExpenseWeekClient({
     try {
       let rId = reportId;
 
+      // When creating a new report, always insert as draft first so RLS allows entry writes.
+      // We'll update the status to the final value after entries are saved.
       if (!rId) {
         const { data, error } = await (supabase.from as any)("expense_reports")
           .insert({
@@ -110,27 +112,36 @@ export function ExpenseWeekClient({
             week_number: weekNumber,
             week_beginning_date: weekBeginningDate,
             destination: destination || null,
-            status: newStatus ?? "draft",
+            status: "draft",
             employee_notes: notes || null,
-            ...(newStatus === "submitted" ? { submitted_at: new Date().toISOString() } : {}),
           })
           .select("id")
           .single();
         if (error) throw error;
         rId = data.id;
-      } else {
+      } else if (newStatus) {
+        // For existing reports, update metadata but keep status as-is for now
+        // so RLS still allows entry writes (status must be draft/rejected/manager_rejected)
         const { error } = await (supabase.from as any)("expense_reports")
           .update({
-            status: newStatus ?? status,
             destination: destination || null,
             employee_notes: notes || null,
-            ...(newStatus === "submitted" ? { submitted_at: new Date().toISOString() } : {}),
+          })
+          .eq("id", rId);
+        if (error) throw error;
+      } else {
+        // Plain save (no status change) — update everything
+        const { error } = await (supabase.from as any)("expense_reports")
+          .update({
+            status: status,
+            destination: destination || null,
+            employee_notes: notes || null,
           })
           .eq("id", rId);
         if (error) throw error;
       }
 
-      // Delete and re-insert entries for clean upsert
+      // Delete and re-insert entries while report is still in a writable status
       await (supabase.from as any)("expense_entries").delete().eq("report_id", rId);
 
       const weekStart = new Date(weekBeginningDate);
@@ -157,6 +168,17 @@ export function ExpenseWeekClient({
 
       const { error: entryError } = await (supabase.from as any)("expense_entries").insert(entryRows);
       if (entryError) throw entryError;
+
+      // NOW update the status (after entries are saved)
+      if (newStatus) {
+        const { error: statusError } = await (supabase.from as any)("expense_reports")
+          .update({
+            status: newStatus,
+            ...(newStatus === "submitted" ? { submitted_at: new Date().toISOString() } : {}),
+          })
+          .eq("id", rId);
+        if (statusError) throw statusError;
+      }
 
       await writeAuditLog(
         rId!,
