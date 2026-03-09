@@ -15,6 +15,7 @@
 import type { Config, Context } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import { createGraphClient, uploadToSharePoint } from "../../lib/msGraph/client";
+import { getAppConfig } from "../../lib/config/appConfig";
 import { timingSafeEqual } from "crypto";
 
 
@@ -90,12 +91,13 @@ export default async function handler(req: Request, _context: Context) {
     }
 
     // Upload to SharePoint
-    const graph = createGraphClient();
+    const appConfig = await getAppConfig();
+    const graph = await createGraphClient(appConfig);
     const { id: spItemId } = await uploadToSharePoint(
       graph,
-      process.env.SHAREPOINT_SITE_ID!,
-      process.env.SHAREPOINT_DRIVE_ID!,
-      process.env.SHAREPOINT_PAYROLL_FOLDER ?? "Payroll/Exports",
+      appConfig.sharepointSiteId,
+      appConfig.sharepointDriveId,
+      appConfig.sharepointPayrollFolder || "Payroll/Exports",
       filename,
       csvContent
     );

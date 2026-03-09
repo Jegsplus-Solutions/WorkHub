@@ -1,6 +1,5 @@
 import { getGraphAccessToken } from "./graphToken";
-
-const DRIVE_ID = process.env.SHAREPOINT_DRIVE_ID!;
+import { getAppConfig } from "../../../../lib/config/appConfig";
 
 /**
  * Upload a file to a SharePoint document library via Graph API.
@@ -12,10 +11,11 @@ export async function uploadCsvToSharePoint(args: {
   path: string;
   csvContent: string;
 }): Promise<{ id: string }> {
-  const token = await getGraphAccessToken();
+  const [token, config] = await Promise.all([getGraphAccessToken(), getAppConfig()]);
+  const driveId = config.sharepointDriveId;
 
   const encodedPath = args.path.split("/").map(encodeURIComponent).join("/");
-  const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/root:/${encodedPath}:/content`;
+  const url = `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${encodedPath}:/content`;
 
   const res = await fetch(url, {
     method: "PUT",

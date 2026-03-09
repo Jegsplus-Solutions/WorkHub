@@ -18,13 +18,10 @@ import { supabaseAdmin, supabaseUser } from "./_lib/supabase";
 import { writeAudit } from "./_lib/audit";
 import { graphGet, graphGetAllPages, graphGetBinary } from "./_lib/graph/client";
 import { mapWithConcurrency } from "./_lib/graph/concurrency";
+import { getAppConfig } from "../../lib/config/appConfig";
 
 export const config: Config = { path: "/api/admin/directory-sync-run" };
 
-
-const ADMIN_GROUP_ID = process.env.AZURE_GROUP_ADMINS!;
-const FINANCE_GROUP_ID = process.env.AZURE_GROUP_FINANCE ?? "";
-const MANAGER_GROUP_ID = process.env.AZURE_GROUP_MANAGERS!;
 const MANAGER_LOOKUP_CONCURRENCY = Number(process.env.GRAPH_MANAGER_LOOKUP_CONCURRENCY ?? "10");
 
 type GraphUser = {
@@ -101,11 +98,14 @@ export default async function handler(req: Request, _context: Context) {
     if (runErr || !run) throw new Error(runErr?.message ?? "Failed to create run record");
     runId = run.id;
 
+    // Load config from DB (falls back to env vars)
+    const appConfig = await getAppConfig();
+
     // 1) Fetch role groups in parallel
     const [adminMembers, financeMembers, managerMembers] = await Promise.all([
-      fetchGroupMemberIds(ADMIN_GROUP_ID),
-      fetchGroupMemberIds(FINANCE_GROUP_ID),
-      fetchGroupMemberIds(MANAGER_GROUP_ID),
+      fetchGroupMemberIds(appConfig.azureGroupAdmins),
+      fetchGroupMemberIds(appConfig.azureGroupFinance),
+      fetchGroupMemberIds(appConfig.azureGroupManagers),
     ]);
 
     // 2) Fetch all users from Graph

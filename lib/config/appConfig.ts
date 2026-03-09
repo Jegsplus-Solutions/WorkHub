@@ -1,0 +1,91 @@
+import { createClient } from "@supabase/supabase-js";
+
+export interface AppConfig {
+  azureTenantId: string;
+  azureClientId: string;
+  azureClientSecret: string;
+  azureGroupAdmins: string;
+  azureGroupManagers: string;
+  azureGroupFinance: string;
+  sharepointSiteId: string;
+  sharepointDriveId: string;
+  sharepointPayrollFolder: string;
+}
+
+const ENV_FALLBACKS: Record<string, string> = {
+  azure_tenant_id: "AZURE_TENANT_ID",
+  azure_client_id: "AZURE_CLIENT_ID",
+  azure_client_secret: "AZURE_CLIENT_SECRET",
+  azure_group_admins: "AZURE_GROUP_ADMINS",
+  azure_group_managers: "AZURE_GROUP_MANAGERS",
+  azure_group_finance: "AZURE_GROUP_FINANCE",
+  sharepoint_site_id: "SHAREPOINT_SITE_ID",
+  sharepoint_drive_id: "SHAREPOINT_DRIVE_ID",
+  sharepoint_payroll_folder: "SHAREPOINT_PAYROLL_FOLDER",
+};
+
+const KEY_TO_PROP: Record<string, keyof AppConfig> = {
+  azure_tenant_id: "azureTenantId",
+  azure_client_id: "azureClientId",
+  azure_client_secret: "azureClientSecret",
+  azure_group_admins: "azureGroupAdmins",
+  azure_group_managers: "azureGroupManagers",
+  azure_group_finance: "azureGroupFinance",
+  sharepoint_site_id: "sharepointSiteId",
+  sharepoint_drive_id: "sharepointDriveId",
+  sharepoint_payroll_folder: "sharepointPayrollFolder",
+};
+
+function createServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
+}
+
+/**
+ * Loads app configuration from the database, falling back to env vars
+ * for any key with an empty DB value. Server-only.
+ */
+export async function getAppConfig(): Promise<AppConfig> {
+  const supabase = createServiceClient();
+
+  const { data: rows } = await supabase
+    .from("app_config")
+    .select("key, value");
+
+  const dbValues = new Map<string, string>();
+  if (rows) {
+    for (const row of rows as { key: string; value: string }[]) {
+      if (row.value) dbValues.set(row.key, row.value);
+    }
+  }
+
+  const config: Record<string, string> = {};
+  for (const [dbKey, propName] of Object.entries(KEY_TO_PROP)) {
+    const envVar = ENV_FALLBACKS[dbKey];
+    config[propName] = dbValues.get(dbKey) || process.env[envVar] || "";
+  }
+
+  return config as unknown as AppConfig;
+}
+
+/**
+ * Get a single config value by DB key name.
+ */
+export async function getConfigValue(key: string): Promise<string> {
+  const supabase = createServiceClient();
+
+  const { data } = await supabase
+    .from("app_config")
+    .select("value")
+    .eq("key", key)
+    .single();
+
+  const row = data as { value: string } | null;
+  if (row?.value) return row.value;
+
+  const envVar = ENV_FALLBACKS[key];
+  return envVar ? (process.env[envVar] ?? "") : "";
+}

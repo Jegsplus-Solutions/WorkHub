@@ -1,15 +1,18 @@
 import { ClientSecretCredential } from "@azure/identity";
 import { Client, type AuthenticationProvider } from "@microsoft/microsoft-graph-client";
+import { getAppConfig, type AppConfig } from "../config/appConfig";
 
 /**
  * Creates an app-only Microsoft Graph client using client credentials (MSAL).
  * Used by Netlify functions for directory sync and SharePoint export.
+ * Reads Azure credentials from DB config (falls back to env vars).
  */
-export function createGraphClient(): Client {
+export async function createGraphClient(cfg?: AppConfig): Promise<Client> {
+  const config = cfg ?? await getAppConfig();
   const credential = new ClientSecretCredential(
-    process.env.AZURE_TENANT_ID!,
-    process.env.AZURE_CLIENT_ID!,
-    process.env.AZURE_CLIENT_SECRET!
+    config.azureTenantId,
+    config.azureClientId,
+    config.azureClientSecret
   );
 
   const authProvider: AuthenticationProvider = {

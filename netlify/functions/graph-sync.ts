@@ -13,6 +13,7 @@
 import type { Config, Context } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import { createGraphClient, fetchAllUsers, fetchGroupMembers, fetchUserPhoto } from "../../lib/msGraph/client";
+import { getAppConfig } from "../../lib/config/appConfig";
 
 
 export const config: Config = {
@@ -29,13 +30,14 @@ export default async function handler(_req: Request, _context: Context) {
     { auth: { persistSession: false } }
   );
 
-  const graph = createGraphClient();
+  const appConfig = await getAppConfig();
+  const graph = await createGraphClient(appConfig);
 
   // ── Fetch role group memberships ────────────────────────────────────────────
   const [adminIds, managerIds, financeIds] = await Promise.all([
-    fetchGroupMembers(graph, process.env.AZURE_GROUP_ADMINS!).catch(() => []),
-    fetchGroupMembers(graph, process.env.AZURE_GROUP_MANAGERS!).catch(() => []),
-    fetchGroupMembers(graph, process.env.AZURE_GROUP_FINANCE ?? "").catch(() => []),
+    fetchGroupMembers(graph, appConfig.azureGroupAdmins).catch(() => []),
+    fetchGroupMembers(graph, appConfig.azureGroupManagers).catch(() => []),
+    fetchGroupMembers(graph, appConfig.azureGroupFinance).catch(() => []),
   ]);
 
   const adminSet = new Set(adminIds);

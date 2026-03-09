@@ -1,14 +1,13 @@
-const TENANT_ID = process.env.AZURE_TENANT_ID!;
-const CLIENT_ID = process.env.AZURE_CLIENT_ID!;
-const CLIENT_SECRET = process.env.AZURE_CLIENT_SECRET!;
+import { getAppConfig } from "../../../../lib/config/appConfig";
 
 /** Acquire a Graph access token using client credentials flow. */
 export async function getGraphAccessToken(): Promise<string> {
-  const url = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
+  const config = await getAppConfig();
+  const url = `https://login.microsoftonline.com/${config.azureTenantId}/oauth2/v2.0/token`;
 
   const params = new URLSearchParams();
-  params.set("client_id", CLIENT_ID);
-  params.set("client_secret", CLIENT_SECRET);
+  params.set("client_id", config.azureClientId);
+  params.set("client_secret", config.azureClientSecret);
   params.set("grant_type", "client_credentials");
   params.set("scope", "https://graph.microsoft.com/.default");
 

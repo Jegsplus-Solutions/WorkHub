@@ -12,7 +12,8 @@ export type AuditEntity =
   | "hours_config"
   | "mileage_rate"
   | "directory_sync"
-  | "sharepoint_sync";
+  | "sharepoint_sync"
+  | "app_config";
 export type AuditAction =
   | "create"
   | "update"
@@ -411,6 +412,27 @@ export interface Database {
           last_error?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["sharepoint_sync"]["Insert"]>;
+      };
+
+      app_config: {
+        Row: {
+          key: string;
+          value: string;
+          is_secret: boolean;
+          label: string;
+          description: string | null;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          key: string;
+          value?: string;
+          is_secret?: boolean;
+          label?: string;
+          description?: string | null;
+          updated_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["app_config"]["Insert"]>;
       };
     };
 
