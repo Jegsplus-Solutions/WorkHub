@@ -37,7 +37,7 @@ export function SharePointSyncPanel({ logs: initialLogs }: SharePointSyncPanelPr
       const res = await fetch("/api/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: log.entity_type, id: log.entity_id }),
+        body: JSON.stringify({ type: log.entity_type === "expense_report" ? "expense" : log.entity_type, id: log.entity_id }),
       });
       const result = await res.json();
       if (result.ok) {

@@ -20,21 +20,21 @@ const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 interface NavItem {
   href: string;
   label: string;
-  roles: Array<"employee" | "manager" | "admin">;
+  roles: Array<"employee" | "manager" | "admin" | "finance">;
   teamHref?: Record<string, string>;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", roles: ["employee", "manager", "admin"] },
-  { href: "/timesheets", label: "Time Sheet", roles: ["employee", "manager", "admin"] },
-  { href: "/expenses", label: "Expense", roles: ["employee", "manager", "admin"] },
-  { href: "/leave", label: "Leave", roles: ["employee", "manager", "admin"] },
-  { href: "/approvals", label: "Team", roles: ["manager", "admin"], teamHref: { manager: "/approvals", admin: "/people" } },
-  { href: "/reports", label: "Documents", roles: ["manager", "admin"] },
+  { href: "/dashboard", label: "Dashboard", roles: ["employee", "manager", "admin", "finance"] },
+  { href: "/timesheets", label: "Time Sheet", roles: ["employee", "manager", "admin", "finance"] },
+  { href: "/expenses", label: "Expense", roles: ["employee", "manager", "admin", "finance"] },
+  { href: "/leave", label: "Leave", roles: ["employee", "manager", "admin", "finance"] },
+  { href: "/approvals", label: "Team", roles: ["manager", "admin", "finance"], teamHref: { manager: "/approvals", admin: "/people", finance: "/approvals" } },
+  { href: "/reports", label: "Documents", roles: ["manager", "admin", "finance"] },
 ];
 
 interface TopNavProps {
-  role?: "employee" | "manager" | "admin";
+  role?: "employee" | "manager" | "admin" | "finance";
   pendingApprovals?: number;
   userName?: string;
   userEmail?: string;
@@ -273,7 +273,7 @@ export function TopNav({
               <Link href="/settings" onClick={() => setAvatarOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors">
                 <Settings className="w-4 h-4 text-gray-400" />Settings
               </Link>
-              {role === "admin" && (
+              {(role === "admin" || role === "finance") && (
                 <>
                   <Link href="/admin" onClick={() => setAvatarOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors">
                     <ShieldCheck className="w-4 h-4 text-gray-400" />Admin

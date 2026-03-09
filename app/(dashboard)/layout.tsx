@@ -26,7 +26,7 @@ export default async function DashboardLayout({
   // Count pending approvals for managers/admins/finance
   let pendingApprovals = 0;
   if (role === "manager" || role === "admin" || role === "finance") {
-    const [ts, ex] = await Promise.all([
+    const [ts, ex, lv] = await Promise.all([
       supabase
         .from("timesheets")
         .select("id", { count: "exact", head: true })
@@ -35,8 +35,12 @@ export default async function DashboardLayout({
         .from("expense_reports")
         .select("id", { count: "exact", head: true })
         .eq("status", "submitted"),
+      supabase
+        .from("leave_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "submitted"),
     ]);
-    pendingApprovals = (ts.count ?? 0) + (ex.count ?? 0);
+    pendingApprovals = (ts.count ?? 0) + (ex.count ?? 0) + (lv.count ?? 0);
   }
 
   return (
