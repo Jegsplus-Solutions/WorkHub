@@ -52,24 +52,41 @@ export async function getAppConfig(): Promise<AppConfig> {
   const dbValues = new Map<string, string>();
 
   try {
-    const supabase = createServiceClient();
-    const { data: rows, error } = await supabase
-      .from("app_config")
-      .select("key, value");
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    console.log("[getAppConfig] SUPABASE_URL set:", !!url, "SERVICE_ROLE_KEY set:", !!key, "key length:", key?.length ?? 0);
 
-    if (!error && rows) {
-      for (const row of rows as { key: string; value: string }[]) {
-        if (row.value) dbValues.set(row.key, row.value);
+    if (!url || !key) {
+      console.warn("[getAppConfig] Missing Supabase env vars — falling back to env vars only");
+    } else {
+      const supabase = createServiceClient();
+      const { data: rows, error } = await supabase
+        .from("app_config")
+        .select("key, value");
+
+      if (error) {
+        console.error("[getAppConfig] DB query error:", error.message, error.code);
+      } else if (rows) {
+        console.log("[getAppConfig] Loaded", rows.length, "config rows from DB");
+        for (const row of rows as { key: string; value: string }[]) {
+          if (row.value) dbValues.set(row.key, row.value);
+        }
       }
     }
-  } catch {
-    // DB not available or table missing — fall back to env vars
+  } catch (err: any) {
+    console.error("[getAppConfig] Exception:", err?.message ?? err);
   }
 
   const config: Record<string, string> = {};
   for (const [dbKey, propName] of Object.entries(KEY_TO_PROP)) {
     const envVar = ENV_FALLBACKS[dbKey];
-    config[propName] = dbValues.get(dbKey) || process.env[envVar] || "";
+    const dbVal = dbValues.get(dbKey);
+    const envVal = process.env[envVar];
+    config[propName] = dbVal || envVal || "";
+    // Log source for each key (mask secrets)
+    const source = dbVal ? "db" : envVal ? "env" : "EMPTY";
+    const isSafe = !dbKey.includes("secret");
+    console.log(`[getAppConfig] ${dbKey}: source=${source}${isSafe ? `, value=${(config[propName] || "").substring(0, 8)}...` : ""}`);
   }
 
   return config as unknown as AppConfig;
