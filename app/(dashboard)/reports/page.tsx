@@ -25,7 +25,7 @@ export default async function ReportsPage() {
       .eq("year", currentYear),
     supabase
       .from("expense_reports")
-      .select("id, status, year, week_number, expense_entries(mileage_cost_claimed, lodging_amount, breakfast_amount, lunch_amount, dinner_amount, other_amount)")
+      .select("id, status, year, week_number, expense_entries(mileage_cost, lodging_amount, breakfast_amount, lunch_amount, dinner_amount, other_amount)")
       .eq("year", currentYear),
   ]);
 
@@ -51,7 +51,7 @@ export default async function ReportsPage() {
       .reduce((s, e) => {
         const total = (e.expense_entries ?? []).reduce(
           (t: number, en: any) =>
-            t + (en.mileage_cost_claimed ?? 0) + (en.lodging_amount ?? 0) +
+            t + (en.mileage_cost ?? 0) + (en.lodging_amount ?? 0) +
             (en.breakfast_amount ?? 0) + (en.lunch_amount ?? 0) +
             (en.dinner_amount ?? 0) + (en.other_amount ?? 0),
           0

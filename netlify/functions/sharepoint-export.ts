@@ -204,22 +204,13 @@ async function buildExpenseCsv(supabase: any, id: string) {
 
   const r = report as any;
 
-  // Fetch mileage rate for this employee and year
-  const { data: mileageRate } = await supabase
-    .from("mileage_rate_config")
-    .select("rate_per_km")
-    .eq("employee_id", r.employee_id)
-    .eq("year", r.year)
-    .single();
-
-  const ratePerKm = mileageRate?.rate_per_km ?? 0;
   const weekBeginning = r.week_beginning_date ?? "";
   const filename = `expenses_${r.employee.email.replace("@", "_at_")}_${weekBeginning}.csv`;
 
   const headers = [
     "Employee Email", "Employee Name", "Department",
     "Year", "Month", "Week", "Week Beginning", "Destination",
-    "Day", "Mileage KM", "Mileage Rate", "Mileage Claimed",
+    "Day", "Mileage KM", "Mileage Cost",
     "Lodging", "Breakfast", "Lunch", "Dinner", "Other",
     "Daily Total", "Travel From", "Travel To", "Notes",
     "Status", "Submitted At", "Approved At",
@@ -229,7 +220,7 @@ async function buildExpenseCsv(supabase: any, id: string) {
     .sort((a: any, b: any) => a.day_index - b.day_index)
     .map((entry: any) => {
       const dailyTotal =
-        (entry.mileage_cost_claimed ?? 0) +
+        (entry.mileage_cost ?? 0) +
         (entry.lodging_amount ?? 0) +
         (entry.breakfast_amount ?? 0) +
         (entry.lunch_amount ?? 0) +
@@ -246,8 +237,7 @@ async function buildExpenseCsv(supabase: any, id: string) {
         r.destination ?? "",
         DAY_NAMES[entry.day_index] ?? entry.day_index,
         entry.mileage_km ?? 0,
-        ratePerKm,
-        entry.mileage_cost_claimed ?? 0,
+        entry.mileage_cost ?? 0,
         entry.lodging_amount ?? 0,
         entry.breakfast_amount ?? 0,
         entry.lunch_amount ?? 0,

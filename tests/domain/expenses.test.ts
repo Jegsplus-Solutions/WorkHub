@@ -9,8 +9,6 @@ import {
 import { validateExpenseWeek } from "@/domain/expenses/validation";
 import type { ExpenseDayEntry } from "@/domain/expenses/types";
 
-const RATE = 0.61;
-
 function makeEntry(overrides: Partial<ExpenseDayEntry> = {}): ExpenseDayEntry {
   return { ...emptyExpenseDayEntry(), ...overrides };
 }
@@ -19,44 +17,35 @@ function makeEntry(overrides: Partial<ExpenseDayEntry> = {}): ExpenseDayEntry {
 
 describe("calcExpenseDayTotal", () => {
   it("returns zeros for an empty entry", () => {
-    const result = calcExpenseDayTotal(emptyExpenseDayEntry(), RATE);
-    expect(result.suggestedMileageCost).toBe(0);
+    const result = calcExpenseDayTotal(emptyExpenseDayEntry());
     expect(result.dailyTotal).toBe(0);
     expect(result.totalMeals).toBe(0);
   });
 
-  it("calculates suggestedMileageCost = km * rate (display only)", () => {
-    const entry = makeEntry({ mileageKm: 100, mileageCostClaimed: 50 });
-    const result = calcExpenseDayTotal(entry, RATE);
-    expect(result.suggestedMileageCost).toBeCloseTo(61); // 100 * 0.61
-  });
-
-  it("uses mileageCostClaimed (not suggested) in dailyTotal", () => {
-    const entry = makeEntry({ mileageKm: 100, mileageCostClaimed: 50 });
-    const result = calcExpenseDayTotal(entry, RATE);
-    // dailyTotal should use 50, not 61
+  it("includes mileageCost in dailyTotal", () => {
+    const entry = makeEntry({ mileageCost: 50 });
+    const result = calcExpenseDayTotal(entry);
     expect(result.dailyTotal).toBe(50);
   });
 
-  it("calculates dailyTotal = claimed + lodging + meals + other", () => {
+  it("calculates dailyTotal = mileageCost + lodging + meals + other", () => {
     const entry = makeEntry({
-      mileageCostClaimed: 50,
+      mileageCost: 50,
       lodging: 120,
       breakfast: 12,
       lunch: 15,
       dinner: 30,
       other: 25,
     });
-    const result = calcExpenseDayTotal(entry, RATE);
+    const result = calcExpenseDayTotal(entry);
     expect(result.totalMeals).toBe(57);
     expect(result.dailyTotal).toBe(50 + 120 + 57 + 25);
   });
 
-  it("does NOT include suggestedMileageCost in dailyTotal", () => {
-    // Even if km > claimed, suggested should not be added to the total
-    const entry = makeEntry({ mileageKm: 200, mileageCostClaimed: 80 });
-    const result = calcExpenseDayTotal(entry, RATE);
-    expect(result.dailyTotal).toBe(80); // not 122 (200*0.61)
+  it("km field does not affect dailyTotal", () => {
+    const entry = makeEntry({ mileageKm: 200, mileageCost: 40 });
+    const result = calcExpenseDayTotal(entry);
+    expect(result.dailyTotal).toBe(40);
   });
 });
 
@@ -65,40 +54,32 @@ describe("calcExpenseDayTotal", () => {
 describe("calcExpenseWeeklyTotals", () => {
   it("returns all zeros for empty days", () => {
     const days = emptyExpenseDaysMap();
-    const totals = calcExpenseWeeklyTotals(days, RATE);
+    const totals = calcExpenseWeeklyTotals(days);
     expect(totals.weeklyTotal).toBe(0);
     expect(totals.totalMileageKm).toBe(0);
-    expect(totals.mileageCostAtRate).toBe(0);
+    expect(totals.totalMileageCost).toBe(0);
   });
 
   it("sums totalMileageKm across all days", () => {
     const days = emptyExpenseDaysMap();
-    days.mon = makeEntry({ mileageKm: 50 });
-    days.tue = makeEntry({ mileageKm: 30 });
-    const totals = calcExpenseWeeklyTotals(days, RATE);
-    expect(totals.totalMileageKm).toBe(80);
-  });
-
-  it("calculates mileageCostAtRate = totalMileageKm * ratePerKm", () => {
-    const days = emptyExpenseDaysMap();
     days.mon = makeEntry({ mileageKm: 100 });
-    const totals = calcExpenseWeeklyTotals(days, RATE);
-    expect(totals.mileageCostAtRate).toBeCloseTo(61);
+    days.tue = makeEntry({ mileageKm: 30 });
+    const totals = calcExpenseWeeklyTotals(days);
+    expect(totals.totalMileageKm).toBe(130);
   });
 
-  it("mileageCostAtRate is NOT included in weeklyTotal", () => {
+  it("sums totalMileageCost across all days", () => {
     const days = emptyExpenseDaysMap();
-    // 100km at $0.61/km = $61 suggested, but we claim $50
-    days.mon = makeEntry({ mileageKm: 100, mileageCostClaimed: 50 });
-    const totals = calcExpenseWeeklyTotals(days, RATE);
-    expect(totals.weeklyTotal).toBe(50); // not 61
+    days.mon = makeEntry({ mileageCost: 50 });
+    const totals = calcExpenseWeeklyTotals(days);
+    expect(totals.totalMileageCost).toBe(50);
   });
 
-  it("weeklyTotal = claimed + lodging + meals + other across all days", () => {
+  it("weeklyTotal = mileageCost + lodging + meals + other across all days", () => {
     const days = emptyExpenseDaysMap();
-    days.mon = makeEntry({ mileageCostClaimed: 50, lodging: 100, breakfast: 10, lunch: 15, dinner: 20, other: 5 });
-    days.tue = makeEntry({ mileageCostClaimed: 30, lodging: 0, lunch: 12 });
-    const totals = calcExpenseWeeklyTotals(days, RATE);
+    days.mon = makeEntry({ mileageCost: 50, lodging: 100, breakfast: 10, lunch: 15, dinner: 20, other: 5 });
+    days.tue = makeEntry({ mileageCost: 30, lodging: 0, lunch: 12 });
+    const totals = calcExpenseWeeklyTotals(days);
     // mon: 50+100+(10+15+20)+5 = 200
     // tue: 30+0+(12) = 42
     expect(totals.weeklyTotal).toBe(242);
@@ -126,20 +107,20 @@ describe("validateExpenseWeek", () => {
     expect(err).toBeDefined();
   });
 
-  it("warns when mileage km entered but no claimed cost", () => {
+  it("warns when mileage km entered but no cost", () => {
     const days = emptyExpenseDaysMap();
-    days.mon = makeEntry({ mileageKm: 50, mileageCostClaimed: 0 });
+    days.mon = makeEntry({ mileageKm: 50, mileageCost: 0 });
     const result = validateExpenseWeek(days);
-    const warn = result.warnings.find((w) => w.day === "mon" && w.field === "mileageCostClaimed");
+    const warn = result.warnings.find((w) => w.day === "mon" && w.field === "mileageCost");
     expect(warn).toBeDefined();
     expect(warn?.severity).toBe("warning");
   });
 
-  it("does not warn when claimed cost matches", () => {
+  it("does not warn when cost is provided", () => {
     const days = emptyExpenseDaysMap();
-    days.mon = makeEntry({ mileageKm: 50, mileageCostClaimed: 30.50 });
+    days.mon = makeEntry({ mileageKm: 50, mileageCost: 30.50 });
     const result = validateExpenseWeek(days);
-    const warn = result.warnings.find((w) => w.day === "mon" && w.field === "mileageCostClaimed");
+    const warn = result.warnings.find((w) => w.day === "mon" && w.field === "mileageCost");
     expect(warn).toBeUndefined();
   });
 

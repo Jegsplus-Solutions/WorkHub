@@ -428,13 +428,13 @@ function ExpenseDetail({ data }: { data: any }) {
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   // Build totals
-  let totalMileage = 0;
+  let totalMileageCost = 0;
   let totalLodging = 0;
   let totalMeals = 0;
   let totalOther = 0;
 
   for (const e of entries) {
-    totalMileage += Number(e.mileage_cost_claimed) || 0;
+    totalMileageCost += Number(e.mileage_cost) || 0;
     totalLodging += Number(e.lodging_amount) || 0;
     totalMeals +=
       (Number(e.breakfast_amount) || 0) +
@@ -442,7 +442,10 @@ function ExpenseDetail({ data }: { data: any }) {
       (Number(e.dinner_amount) || 0);
     totalOther += Number(e.other_amount) || 0;
   }
-  const grandTotal = totalMileage + totalLodging + totalMeals + totalOther;
+  const grandTotal = totalMileageCost + totalLodging + totalMeals + totalOther;
+
+  const fmtKm = (v: number) => (v > 0 ? `${v.toFixed(1)}km` : "—");
+  const fmtText = (v: string) => v || "—";
 
   return (
     <div className="space-y-4">
@@ -465,7 +468,7 @@ function ExpenseDetail({ data }: { data: any }) {
         <table className="min-w-full">
           <thead>
             <tr className="bg-muted/50">
-              <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground min-w-[120px]">
+              <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground min-w-[140px]">
                 Category
               </th>
               {entries.map((e: any) => (
@@ -487,23 +490,39 @@ function ExpenseDetail({ data }: { data: any }) {
             </tr>
           </thead>
           <tbody>
+            {/* Travel From/To text rows */}
+            <tr className="border-t border-border">
+              <td className="px-3 py-1.5 text-sm font-medium">From</td>
+              {entries.map((e: any) => (
+                <td key={e.day_index} className="px-2 py-1.5 text-sm text-left truncate">
+                  {fmtText(e.travel_from)}
+                </td>
+              ))}
+              <td className="bg-muted/30" />
+            </tr>
+            <tr className="border-t border-border">
+              <td className="px-3 py-1.5 text-sm font-medium">To</td>
+              {entries.map((e: any) => (
+                <td key={e.day_index} className="px-2 py-1.5 text-sm text-left truncate">
+                  {fmtText(e.travel_to)}
+                </td>
+              ))}
+              <td className="bg-muted/30" />
+            </tr>
+            {/* Numeric rows */}
             {[
               {
                 label: "Mileage (km)",
                 key: "mileage_km",
-                format: (v: number) => (v > 0 ? `${v.toFixed(1)}km` : "—"),
-                total: entries.reduce(
-                  (s: number, e: any) =>
-                    s + (Number(e.mileage_km) || 0),
-                  0
-                ),
-                totalFmt: (v: number) => (v > 0 ? `${v.toFixed(1)}km` : "—"),
+                format: fmtKm,
+                total: entries.reduce((s: number, e: any) => s + (Number(e.mileage_km) || 0), 0),
+                totalFmt: fmtKm,
               },
               {
                 label: "Mileage Cost",
-                key: "mileage_cost_claimed",
+                key: "mileage_cost",
                 format: fmtCurrency,
-                total: totalMileage,
+                total: totalMileageCost,
                 totalFmt: fmtCurrency,
               },
               {
@@ -517,33 +536,21 @@ function ExpenseDetail({ data }: { data: any }) {
                 label: "Breakfast",
                 key: "breakfast_amount",
                 format: fmtCurrency,
-                total: entries.reduce(
-                  (s: number, e: any) =>
-                    s + (Number(e.breakfast_amount) || 0),
-                  0
-                ),
+                total: entries.reduce((s: number, e: any) => s + (Number(e.breakfast_amount) || 0), 0),
                 totalFmt: fmtCurrency,
               },
               {
                 label: "Lunch",
                 key: "lunch_amount",
                 format: fmtCurrency,
-                total: entries.reduce(
-                  (s: number, e: any) =>
-                    s + (Number(e.lunch_amount) || 0),
-                  0
-                ),
+                total: entries.reduce((s: number, e: any) => s + (Number(e.lunch_amount) || 0), 0),
                 totalFmt: fmtCurrency,
               },
               {
                 label: "Dinner",
                 key: "dinner_amount",
                 format: fmtCurrency,
-                total: entries.reduce(
-                  (s: number, e: any) =>
-                    s + (Number(e.dinner_amount) || 0),
-                  0
-                ),
+                total: entries.reduce((s: number, e: any) => s + (Number(e.dinner_amount) || 0), 0),
                 totalFmt: fmtCurrency,
               },
               {
@@ -580,7 +587,7 @@ function ExpenseDetail({ data }: { data: any }) {
               <td className="px-3 py-2 font-bold text-sm">Daily Total</td>
               {entries.map((e: any) => {
                 const dayTotal =
-                  (Number(e.mileage_cost_claimed) || 0) +
+                  (Number(e.mileage_cost) || 0) +
                   (Number(e.lodging_amount) || 0) +
                   (Number(e.breakfast_amount) || 0) +
                   (Number(e.lunch_amount) || 0) +
@@ -606,7 +613,7 @@ function ExpenseDetail({ data }: { data: any }) {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { label: "Mileage", value: fmtCurrency(totalMileage) },
+          { label: "Mileage", value: fmtCurrency(totalMileageCost) },
           { label: "Lodging", value: fmtCurrency(totalLodging) },
           { label: "Meals", value: fmtCurrency(totalMeals) },
           { label: "Other", value: fmtCurrency(totalOther) },

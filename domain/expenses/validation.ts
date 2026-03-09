@@ -17,7 +17,7 @@ export interface ExpenseValidationResult {
 
 const NUMERIC_FIELDS: (keyof ExpenseDayEntry)[] = [
   "mileageKm",
-  "mileageCostClaimed",
+  "mileageCost",
   "lodging",
   "breakfast",
   "lunch",
@@ -48,15 +48,12 @@ export function validateExpenseWeek(
       }
     }
 
-    // If mileage km is entered but no claimed cost, warn
-    if (
-      entry.mileageKm > 0 &&
-      entry.mileageCostClaimed === 0
-    ) {
+    // If mileage km is entered but no cost, warn
+    if (entry.mileageKm > 0 && entry.mileageCost === 0) {
       issues.push({
         day,
-        field: "mileageCostClaimed",
-        message: `Mileage of ${entry.mileageKm}km entered on ${day} but claimed cost is $0. Did you mean to claim mileage?`,
+        field: "mileageCost",
+        message: `Mileage of ${entry.mileageKm}km entered on ${day} but cost is $0.`,
         severity: "warning",
       });
     }

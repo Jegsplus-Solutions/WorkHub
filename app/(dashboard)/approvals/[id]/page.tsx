@@ -59,7 +59,7 @@ export default async function ApprovalDetailPage({ params, searchParams }: Props
       .select(`
         id, year, week_number, destination, status, submitted_at, employee_notes, manager_comments,
         employee:profiles!employee_id(id, display_name, email, department),
-        expense_entries(day_index, entry_date, travel_from, travel_to, mileage_km, mileage_cost_claimed,
+        expense_entries(day_index, entry_date, travel_from, travel_to, mileage_km, mileage_cost,
           lodging_amount, breakfast_amount, lunch_amount, dinner_amount, other_amount, other_note, notes)
       `)
       .eq("id", id)

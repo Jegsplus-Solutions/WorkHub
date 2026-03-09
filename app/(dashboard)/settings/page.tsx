@@ -12,12 +12,9 @@ export default async function SettingsPage() {
 
   if (!user) redirect("/login");
 
-  const currentYear = new Date().getFullYear();
-
-  const [role, hoursResult, mileageResult, projectsResult]: any[] = await Promise.all([
+  const [role, hoursResult, projectsResult]: any[] = await Promise.all([
     getCurrentUserRole(),
     supabase.from("hours_config" as any).select("contracted_hours, maximum_hours").eq("employee_id", user.id).single(),
-    supabase.from("mileage_rate_config" as any).select("rate_per_km, year").eq("employee_id", user.id).eq("year", currentYear).single(),
     supabase.from("projects").select("id, code, title, active").order("title"),
   ]);
 
@@ -30,10 +27,6 @@ export default async function SettingsPage() {
             hoursConfig={{
               contracted_hours: hoursResult.data?.contracted_hours ?? 40,
               maximum_hours: hoursResult.data?.maximum_hours ?? 60,
-            }}
-            mileageRate={{
-              rate_per_km: mileageResult.data?.rate_per_km ?? 0.61,
-              year: mileageResult.data?.year ?? currentYear,
             }}
             projects={projectsResult.data ?? []}
             userId={user.id}

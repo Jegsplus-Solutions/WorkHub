@@ -44,16 +44,7 @@ export default async function ExpenseReportPage({
     supabase.from("employee_manager").select("manager_id").eq("employee_id", user.id).single(),
   ]);
 
-  // Get current user mileage rate for this year
   const currentYear = new Date().getFullYear();
-  const { data: rateRow }: any = await supabase
-    .from("mileage_rate_config" as any)
-    .select("rate_per_km")
-    .eq("employee_id", user.id)
-    .eq("year", currentYear)
-    .single();
-  const ratePerKm = rateRow?.rate_per_km ?? 0.61;
-
   const userRole = await getCurrentUserRole();
 
   if (id === "new") {
@@ -85,7 +76,6 @@ export default async function ExpenseReportPage({
             year={year}
             weekBeginningDate={format(weekStart, "yyyy-MM-dd")}
             initialDays={emptyExpenseDaysMap()}
-            ratePerKm={ratePerKm}
             weekDates={weekDates}
             status="draft"
             userRole={userRole}
@@ -128,16 +118,16 @@ export default async function ExpenseReportPage({
     const day = IDX_TO_DAY[e.day_index] as ExpenseDay | undefined;
     if (!day) continue;
     days[day] = {
-      mileageKm: e.mileage_km,
-      mileageCostClaimed: e.mileage_cost_claimed,
+      travelFrom: e.travel_from ?? "",
+      travelTo: e.travel_to ?? "",
+      mileageKm: e.mileage_km ?? 0,
+      mileageCost: e.mileage_cost ?? 0,
       lodging: e.lodging_amount,
       breakfast: e.breakfast_amount,
       lunch: e.lunch_amount,
       dinner: e.dinner_amount,
       other: e.other_amount,
       notes: e.notes ?? "",
-      travelFrom: e.travel_from ?? "",
-      travelTo: e.travel_to ?? "",
       otherNote: e.other_note ?? "",
     };
   }
@@ -157,7 +147,6 @@ export default async function ExpenseReportPage({
           year={report.year}
           weekBeginningDate={report.week_beginning_date}
           initialDays={days}
-          ratePerKm={ratePerKm}
           weekDates={weekDates}
           status={report.status}
           userRole={userRole}

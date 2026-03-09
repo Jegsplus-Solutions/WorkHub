@@ -9,42 +9,35 @@ import { EXPENSE_DAYS } from "./types";
 /**
  * Calculates totals for a single expense day.
  *
- * suggestedMileageCost = mileageKm * ratePerKm  (display only)
- * dailyTotal = mileageCostClaimed + lodging + (breakfast + lunch + dinner) + other
+ * dailyTotal = mileageCost + lodging + (breakfast + lunch + dinner) + other
  */
-export function calcExpenseDayTotal(
-  entry: ExpenseDayEntry,
-  ratePerKm: number
-): ExpenseDayTotal {
-  const suggestedMileageCost = safe(entry.mileageKm) * ratePerKm;
+export function calcExpenseDayTotal(entry: ExpenseDayEntry): ExpenseDayTotal {
   const totalMeals =
     safe(entry.breakfast) + safe(entry.lunch) + safe(entry.dinner);
   const dailyTotal =
-    safe(entry.mileageCostClaimed) +
+    safe(entry.mileageCost) +
     safe(entry.lodging) +
     totalMeals +
     safe(entry.other);
 
-  return { suggestedMileageCost, dailyTotal, totalMeals };
+  return { dailyTotal, totalMeals };
 }
 
 /**
  * Calculates all weekly totals for an expense week.
  *
  * totalMileageKm = sum(mileageKm)
- * totalMileageCostClaimed = sum(mileageCostClaimed)
- * mileageCostAtRate = totalMileageKm * ratePerKm  (display only)
+ * totalMileageCost = sum(mileageCost)
  * totalLodging = sum(lodging)
  * totalMeals = sum(breakfast + lunch + dinner)
  * totalOther = sum(other)
- * weeklyTotal = totalMileageCostClaimed + totalLodging + totalMeals + totalOther
+ * weeklyTotal = totalMileageCost + totalLodging + totalMeals + totalOther
  */
 export function calcExpenseWeeklyTotals(
-  days: Record<ExpenseDay, ExpenseDayEntry>,
-  ratePerKm: number
+  days: Record<ExpenseDay, ExpenseDayEntry>
 ): ExpenseWeeklyTotals {
   let totalMileageKm = 0;
-  let totalMileageCostClaimed = 0;
+  let totalMileageCost = 0;
   let totalLodging = 0;
   let totalMeals = 0;
   let totalOther = 0;
@@ -53,24 +46,22 @@ export function calcExpenseWeeklyTotals(
 
   for (const day of EXPENSE_DAYS) {
     const entry = days[day];
-    const dt = calcExpenseDayTotal(entry, ratePerKm);
+    const dt = calcExpenseDayTotal(entry);
     dayTotals[day] = dt;
 
     totalMileageKm += safe(entry.mileageKm);
-    totalMileageCostClaimed += safe(entry.mileageCostClaimed);
+    totalMileageCost += safe(entry.mileageCost);
     totalLodging += safe(entry.lodging);
     totalMeals += dt.totalMeals;
     totalOther += safe(entry.other);
   }
 
-  const mileageCostAtRate = totalMileageKm * ratePerKm;
   const weeklyTotal =
-    totalMileageCostClaimed + totalLodging + totalMeals + totalOther;
+    totalMileageCost + totalLodging + totalMeals + totalOther;
 
   return {
     totalMileageKm,
-    totalMileageCostClaimed,
-    mileageCostAtRate,
+    totalMileageCost,
     totalLodging,
     totalMeals,
     totalOther,
@@ -84,8 +75,10 @@ export function calcExpenseWeeklyTotals(
  */
 export function emptyExpenseDayEntry(): ExpenseDayEntry {
   return {
+    travelFrom: "",
+    travelTo: "",
     mileageKm: 0,
-    mileageCostClaimed: 0,
+    mileageCost: 0,
     lodging: 0,
     breakfast: 0,
     lunch: 0,

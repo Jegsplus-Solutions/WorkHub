@@ -23,7 +23,7 @@ export default async function ApprovalsPage() {
       .select(`
         id, year, week_number, destination, status, submitted_at,
         employee:profiles!employee_id(id, display_name, email, department),
-        expense_entries(mileage_cost_claimed, lodging_amount, breakfast_amount, lunch_amount, dinner_amount, other_amount)
+        expense_entries(mileage_cost, lodging_amount, breakfast_amount, lunch_amount, dinner_amount, other_amount)
       `)
       .in("status", exStatuses)
       .order("submitted_at"),
@@ -49,7 +49,7 @@ export default async function ApprovalsPage() {
   const expenses = (exResult.data ?? []).map((e: any) => {
     const total = (e.expense_entries ?? []).reduce(
       (s: number, en: any) =>
-        s + (en.mileage_cost_claimed ?? 0) + (en.lodging_amount ?? 0) +
+        s + (en.mileage_cost ?? 0) + (en.lodging_amount ?? 0) +
         (en.breakfast_amount ?? 0) + (en.lunch_amount ?? 0) +
         (en.dinner_amount ?? 0) + (en.other_amount ?? 0),
       0

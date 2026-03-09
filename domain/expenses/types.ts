@@ -11,45 +11,38 @@ export const DAY_INDEX: Record<ExpenseDay, number> = {
 };
 
 export interface ExpenseDayEntry {
-  /** Kilometres driven (used to calculate suggested mileage cost) */
+  /** Location traveled from */
+  travelFrom: string;
+  /** Location traveled to */
+  travelTo: string;
+  /** Total kilometres driven */
   mileageKm: number;
-  /** Actual mileage cost claimed by employee (may differ from suggested) */
-  mileageCostClaimed: number;
+  /** Mileage cost entered directly by user */
+  mileageCost: number;
   lodging: number;
   breakfast: number;
   lunch: number;
   dinner: number;
   other: number;
   notes: string;
-  travelFrom?: string;
-  travelTo?: string;
   otherNote?: string;
 }
 
 export type ExpenseStatus = "draft" | "submitted" | "approved" | "rejected";
 
 export interface ExpenseDayTotal {
-  /** suggestedMileageCost = mileageKm * ratePerKm (display only, not in totals) */
-  suggestedMileageCost: number;
-  /** dailyTotal = mileageCostClaimed + lodging + meals + other */
+  /** dailyTotal = mileageCost + lodging + meals + other */
   dailyTotal: number;
   totalMeals: number;
 }
 
 export interface ExpenseWeeklyTotals {
   totalMileageKm: number;
-  totalMileageCostClaimed: number;
-  /** mileageCostAtRate = totalMileageKm * ratePerKm (display only, not in grand total) */
-  mileageCostAtRate: number;
+  totalMileageCost: number;
   totalLodging: number;
   totalMeals: number;
   totalOther: number;
-  /** weeklyTotal = totalMileageCostClaimed + totalLodging + totalMeals + totalOther */
+  /** weeklyTotal = totalMileageCost + totalLodging + totalMeals + totalOther */
   weeklyTotal: number;
   dayTotals: Record<ExpenseDay, ExpenseDayTotal>;
-}
-
-export interface MileageRateConfig {
-  ratePerKm: number;
-  year: number;
 }

@@ -101,7 +101,7 @@ export function CsvExportButtons({ year }: CsvExportButtonsProps) {
           id, year, week_number, week_beginning_date, destination, status, submitted_at, approved_at,
           employee:profiles!employee_id(display_name, email, department),
           expense_entries(day_index, entry_date, travel_from, travel_to,
-            mileage_km, mileage_cost_claimed, lodging_amount,
+            mileage_km, mileage_cost, lodging_amount,
             breakfast_amount, lunch_amount, dinner_amount,
             other_amount, other_note)
         `)
@@ -114,7 +114,7 @@ export function CsvExportButtons({ year }: CsvExportButtonsProps) {
       const headers = [
         "Employee", "Email", "Department", "Year", "Week", "Destination",
         "Day", "Date", "Travel From", "Travel To",
-        "Mileage KM", "Mileage Claimed", "Lodging",
+        "Mileage KM", "Mileage Cost", "Lodging",
         "Breakfast", "Lunch", "Dinner", "Other", "Other Note",
         "Daily Total", "Status", "Submitted At", "Approved At",
       ];
@@ -123,7 +123,7 @@ export function CsvExportButtons({ year }: CsvExportButtonsProps) {
       for (const r of data ?? []) {
         for (const e of (r.expense_entries ?? []).sort((a: any, b: any) => a.day_index - b.day_index)) {
           const dailyTotal =
-            (e.mileage_cost_claimed ?? 0) + (e.lodging_amount ?? 0) +
+            (e.mileage_cost ?? 0) + (e.lodging_amount ?? 0) +
             (e.breakfast_amount ?? 0) + (e.lunch_amount ?? 0) +
             (e.dinner_amount ?? 0) + (e.other_amount ?? 0);
           rows.push([
@@ -138,7 +138,7 @@ export function CsvExportButtons({ year }: CsvExportButtonsProps) {
             e.travel_from ?? "",
             e.travel_to ?? "",
             String(e.mileage_km ?? 0),
-            String(e.mileage_cost_claimed ?? 0),
+            String(e.mileage_cost ?? 0),
             String(e.lodging_amount ?? 0),
             String(e.breakfast_amount ?? 0),
             String(e.lunch_amount ?? 0),

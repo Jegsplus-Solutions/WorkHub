@@ -119,7 +119,7 @@ export default async function DashboardPage() {
       .select("display_name,email,avatar_url,department,job_title")
       .eq("id", user.id).single(),
     supabase.from("expense_reports")
-      .select("expense_entries(mileage_cost_claimed,lodging_amount,breakfast_amount,lunch_amount,dinner_amount,other_amount)")
+      .select("expense_entries(mileage_cost,lodging_amount,breakfast_amount,lunch_amount,dinner_amount,other_amount)")
       .eq("employee_id",user.id).eq("year",year).eq("week_number",isoWeek),
     isApprover
       ? supabase.from("expense_reports")
@@ -155,7 +155,7 @@ export default async function DashboardPage() {
   const realExpenses     = exRes.data ?? [];
 
   const expEntries = (wkExRes.data ?? []).flatMap((e:any) => e.expense_entries ?? []);
-  const catMileage = expEntries.reduce((s:number, e:any) => s + (e.mileage_cost_claimed ?? 0), 0);
+  const catMileage = expEntries.reduce((s:number, e:any) => s + (e.mileage_cost ?? 0), 0);
   const catLodging = expEntries.reduce((s:number, e:any) => s + (e.lodging_amount ?? 0), 0);
   const catMeals   = expEntries.reduce((s:number, e:any) => s + (e.breakfast_amount ?? 0) + (e.lunch_amount ?? 0) + (e.dinner_amount ?? 0), 0);
   const catOther   = expEntries.reduce((s:number, e:any) => s + (e.other_amount ?? 0), 0);

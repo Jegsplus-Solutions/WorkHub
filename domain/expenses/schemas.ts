@@ -31,7 +31,7 @@ export const ExpenseEntrySchema = z.object({
   travelFrom: z.string().max(200).nullable().optional(),
   travelTo: z.string().max(200).nullable().optional(),
   mileageKm: KmSchema.default(0),
-  mileageCostClaimed: MoneySchema.default(0),
+  mileageCost: MoneySchema.default(0),
   lodgingAmount: MoneySchema.default(0),
   breakfastAmount: MoneySchema.default(0),
   lunchAmount: MoneySchema.default(0),
@@ -40,15 +40,9 @@ export const ExpenseEntrySchema = z.object({
   otherNote: z.string().max(2000).nullable().optional(),
 });
 
-export const MileageRateConfigSchema = z.object({
-  year: z.number().int().min(2000).max(2100),
-  ratePerKm: z.number().finite().min(0).max(9999),
-});
-
 export const ExpenseUpsertPayloadSchema = z.object({
   report: ExpenseReportSchema,
   entries: z.array(ExpenseEntrySchema).max(6),
-  mileageRate: MileageRateConfigSchema.optional(),
 });
 
 export type ExpenseReportInput = z.infer<typeof ExpenseReportSchema>;

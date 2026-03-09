@@ -293,7 +293,7 @@ export interface Database {
           travel_from: string | null;
           travel_to: string | null;
           mileage_km: number;
-          mileage_cost_claimed: number;
+          mileage_cost: number;
           lodging_amount: number;
           breakfast_amount: number;
           lunch_amount: number;
@@ -311,7 +311,7 @@ export interface Database {
           travel_from?: string | null;
           travel_to?: string | null;
           mileage_km?: number;
-          mileage_cost_claimed?: number;
+          mileage_cost?: number;
           lodging_amount?: number;
           breakfast_amount?: number;
           lunch_amount?: number;

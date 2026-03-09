@@ -22,7 +22,6 @@ interface ExpenseWeekClientProps {
   year: number;
   weekBeginningDate: string;
   initialDays: Record<ExpenseDay, ExpenseDayEntry>;
-  ratePerKm: number;
   weekDates: Partial<Record<ExpenseDay, string>>;
   status: string;
   userRole: string;
@@ -47,7 +46,6 @@ export function ExpenseWeekClient({
   year,
   weekBeginningDate,
   initialDays,
-  ratePerKm,
   weekDates,
   status: initialStatus,
   userRole,
@@ -152,10 +150,10 @@ export function ExpenseWeekClient({
           report_id: rId!,
           day_index: idx,
           entry_date: format(addDays(weekStart, idx), "yyyy-MM-dd"),
-          travel_from: entry.travelFrom ?? null,
-          travel_to: entry.travelTo ?? null,
+          travel_from: entry.travelFrom || null,
+          travel_to: entry.travelTo || null,
           mileage_km: entry.mileageKm,
-          mileage_cost_claimed: entry.mileageCostClaimed,
+          mileage_cost: entry.mileageCost,
           lodging_amount: entry.lodging,
           breakfast_amount: entry.breakfast,
           lunch_amount: entry.lunch,
@@ -368,7 +366,6 @@ export function ExpenseWeekClient({
         <>
           <ExpenseGrid
             days={days}
-            ratePerKm={ratePerKm}
             weekDates={weekDates}
             readOnly={!canEdit}
             onChange={setDays}

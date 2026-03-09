@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { AlertCircle, AlertTriangle, Info } from "lucide-react";
+import { AlertCircle, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ExpenseDayEntry, ExpenseDay } from "@/domain/expenses/types";
 import { EXPENSE_DAYS } from "@/domain/expenses/types";
 import {
   calcExpenseWeeklyTotals,
-  emptyExpenseDaysMap,
   formatCurrency,
 } from "@/domain/expenses/calculations";
 import { validateExpenseWeek } from "@/domain/expenses/validation";
@@ -18,17 +17,16 @@ const DAY_LABELS: Record<ExpenseDay, string> = {
 
 interface ExpenseGridProps {
   days: Record<ExpenseDay, ExpenseDayEntry>;
-  ratePerKm: number;
   weekDates: Partial<Record<ExpenseDay, string>>;
   readOnly?: boolean;
   onChange?: (days: Record<ExpenseDay, ExpenseDayEntry>) => void;
 }
 
-type ExpenseField = keyof Omit<ExpenseDayEntry, "notes">;
+type NumericField = "mileageKm" | "mileageCost" | "lodging" | "breakfast" | "lunch" | "dinner" | "other";
 
-const EXPENSE_FIELDS: { key: ExpenseField; label: string; isMileageGroup?: boolean }[] = [
-  { key: "mileageKm", label: "Mileage (km)" },
-  { key: "mileageCostClaimed", label: "Mileage Cost ($)" },
+const EXPENSE_FIELDS: { key: NumericField; label: string; isKm?: boolean }[] = [
+  { key: "mileageKm", label: "Mileage (km)", isKm: true },
+  { key: "mileageCost", label: "Mileage Cost ($)" },
   { key: "lodging", label: "Lodging ($)" },
   { key: "breakfast", label: "Breakfast ($)" },
   { key: "lunch", label: "Lunch ($)" },
@@ -38,7 +36,6 @@ const EXPENSE_FIELDS: { key: ExpenseField; label: string; isMileageGroup?: boole
 
 export function ExpenseGrid({
   days: initialDays,
-  ratePerKm,
   weekDates,
   readOnly = false,
   onChange,
@@ -53,33 +50,34 @@ export function ExpenseGrid({
     [onChange]
   );
 
-  function updateField(day: ExpenseDay, field: ExpenseField, raw: string) {
+  function updateNumeric(day: ExpenseDay, field: NumericField, raw: string) {
     const val = parseFloat(raw);
     const safeVal = isNaN(val) || raw === "" ? 0 : Math.max(0, val);
-    const updated = { ...days[day], [field]: safeVal };
-    // Auto-fill Mileage Cost when km is entered
-    if (field === "mileageKm") {
-      updated.mileageCostClaimed = parseFloat((safeVal * ratePerKm).toFixed(2));
-    }
-    emit({ ...days, [day]: updated });
+    emit({ ...days, [day]: { ...days[day], [field]: safeVal } });
   }
 
-  function updateNotes(day: ExpenseDay, notes: string) {
-    emit({ ...days, [day]: { ...days[day], notes } });
+  function updateText(day: ExpenseDay, field: "travelFrom" | "travelTo" | "notes", value: string) {
+    emit({ ...days, [day]: { ...days[day], [field]: value } });
   }
 
-  const totals = calcExpenseWeeklyTotals(days, ratePerKm);
+  const totals = calcExpenseWeeklyTotals(days);
   const validation = validateExpenseWeek(days);
+
+  function weeklyValForField(field: NumericField): number {
+    switch (field) {
+      case "mileageKm": return totals.totalMileageKm;
+      case "mileageCost": return totals.totalMileageCost;
+      case "lodging": return totals.totalLodging;
+      case "breakfast":
+      case "lunch":
+      case "dinner": return EXPENSE_DAYS.reduce((s, d) => s + Number(days[d][field] ?? 0), 0);
+      case "other": return totals.totalOther;
+      default: return 0;
+    }
+  }
 
   return (
     <div className="space-y-3">
-      {/* Rate info */}
-      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
-        <Info className="w-3.5 h-3.5 shrink-0" />
-        Current mileage rate: <strong>${ratePerKm.toFixed(4)}/km</strong>.
-        &ldquo;Mileage Cost&rdquo; is auto-filled from km × rate and can be adjusted manually.
-      </div>
-
       {/* Validation alerts */}
       {validation.errors.map((e, i) => (
         <div key={i} className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
@@ -115,20 +113,51 @@ export function ExpenseGrid({
           </thead>
 
           <tbody>
-            {EXPENSE_FIELDS.map((field) => {
-              let weeklyVal: number;
-              switch (field.key) {
-                case "mileageKm": weeklyVal = totals.totalMileageKm; break;
-                case "mileageCostClaimed": weeklyVal = totals.totalMileageCostClaimed; break;
-                case "lodging": weeklyVal = totals.totalLodging; break;
-                case "breakfast":
-                case "lunch":
-                case "dinner": weeklyVal = EXPENSE_DAYS.reduce((s, d) => s + Number(days[d][field.key] ?? 0), 0); break;
-                case "other": weeklyVal = totals.totalOther; break;
-                default: weeklyVal = 0;
-              }
+            {/* Travel From row */}
+            <tr className="hover:bg-accent/20 transition-colors">
+              <td className="sticky left-0 bg-background px-3 py-1.5 font-medium text-sm">From</td>
+              {EXPENSE_DAYS.map((day) => (
+                <td key={day}>
+                  {readOnly ? (
+                    <div className="px-2 py-1 text-sm text-left truncate">{days[day].travelFrom || "—"}</div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={days[day].travelFrom}
+                      onChange={(e) => updateText(day, "travelFrom", e.target.value)}
+                      placeholder="Location"
+                      className="w-full text-sm bg-transparent py-1.5 px-2 outline-none focus:ring-2 focus:ring-primary/30 rounded"
+                    />
+                  )}
+                </td>
+              ))}
+              <td className="bg-muted/30" />
+            </tr>
 
-              const isMileageSuggested = false;
+            {/* Travel To row */}
+            <tr className="hover:bg-accent/20 transition-colors border-b border-border">
+              <td className="sticky left-0 bg-background px-3 py-1.5 font-medium text-sm">To</td>
+              {EXPENSE_DAYS.map((day) => (
+                <td key={day}>
+                  {readOnly ? (
+                    <div className="px-2 py-1 text-sm text-left truncate">{days[day].travelTo || "—"}</div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={days[day].travelTo}
+                      onChange={(e) => updateText(day, "travelTo", e.target.value)}
+                      placeholder="Location"
+                      className="w-full text-sm bg-transparent py-1.5 px-2 outline-none focus:ring-2 focus:ring-primary/30 rounded"
+                    />
+                  )}
+                </td>
+              ))}
+              <td className="bg-muted/30" />
+            </tr>
+
+            {/* Numeric expense rows */}
+            {EXPENSE_FIELDS.map((field) => {
+              const weeklyVal = weeklyValForField(field.key);
 
               return (
                 <tr key={field.key} className="hover:bg-accent/20 transition-colors">
@@ -141,51 +170,35 @@ export function ExpenseGrid({
                       (e) => e.day === day && e.field === field.key
                     );
 
-                    // Show suggested mileage cost below the km field
-                    const suggestedLabel =
-                      field.key === "mileageKm" && days[day].mileageKm > 0
-                        ? `≈ ${formatCurrency(totals.dayTotals[day].suggestedMileageCost)}`
-                        : null;
-
                     return (
                       <td key={day} className={cn("text-right", hasErr && "bg-red-50")}>
                         {readOnly ? (
                           <div className="px-2 py-1 text-sm">
-                            {field.key === "mileageKm"
+                            {field.isKm
                               ? val > 0 ? `${val}km` : "—"
                               : val > 0
                               ? formatCurrency(val)
                               : "—"}
-                            {suggestedLabel && (
-                              <div className="text-xs text-muted-foreground">{suggestedLabel}</div>
-                            )}
                           </div>
                         ) : (
-                          <div className="relative">
-                            <input
-                              type="number"
-                              min="0"
-                              step={field.key === "mileageKm" ? "0.1" : "0.01"}
-                              value={val || ""}
-                              onChange={(e) => updateField(day, field.key, e.target.value)}
-                              placeholder="0"
-                              className={cn(
-                                "w-full text-right text-sm bg-transparent py-1.5 px-2 outline-none focus:ring-2 focus:ring-primary/30 rounded",
-                                hasErr && "text-red-600"
-                              )}
-                            />
-                            {suggestedLabel && (
-                              <div className="text-xs text-muted-foreground text-right px-2 pb-0.5">
-                                {suggestedLabel}
-                              </div>
+                          <input
+                            type="number"
+                            min="0"
+                            step={field.isKm ? "0.1" : "0.01"}
+                            value={val || ""}
+                            onChange={(e) => updateNumeric(day, field.key, e.target.value)}
+                            placeholder="0"
+                            className={cn(
+                              "w-full text-right text-sm bg-transparent py-1.5 px-2 outline-none focus:ring-2 focus:ring-primary/30 rounded",
+                              hasErr && "text-red-600"
                             )}
-                          </div>
+                          />
                         )}
                       </td>
                     );
                   })}
                   <td className="text-right px-3 py-1.5 bg-muted/30 font-semibold text-sm">
-                    {field.key === "mileageKm"
+                    {field.isKm
                       ? `${weeklyVal.toFixed(1)}km`
                       : weeklyVal > 0
                       ? formatCurrency(weeklyVal)
@@ -194,25 +207,6 @@ export function ExpenseGrid({
                 </tr>
               );
             })}
-
-            {/* Suggested mileage cost at rate — display only */}
-            <tr className="bg-blue-50/40 text-muted-foreground italic">
-              <td className="sticky left-0 bg-blue-50/40 px-3 py-1.5 text-xs">
-                Mileage at rate (reference)
-              </td>
-              {EXPENSE_DAYS.map((day) => (
-                <td key={day} className="text-right px-2 py-1.5 text-xs">
-                  {days[day].mileageKm > 0
-                    ? formatCurrency(totals.dayTotals[day].suggestedMileageCost)
-                    : "—"}
-                </td>
-              ))}
-              <td className="text-right px-3 py-1.5 text-xs bg-blue-50/40">
-                {totals.mileageCostAtRate > 0
-                  ? formatCurrency(totals.mileageCostAtRate)
-                  : "—"}
-              </td>
-            </tr>
 
             {/* Notes row */}
             {!readOnly && (
@@ -223,7 +217,7 @@ export function ExpenseGrid({
                     <input
                       type="text"
                       value={days[day].notes}
-                      onChange={(e) => updateNotes(day, e.target.value)}
+                      onChange={(e) => updateText(day, "notes", e.target.value)}
                       placeholder="…"
                       className="w-full text-xs bg-transparent py-1.5 px-2 outline-none focus:ring-2 focus:ring-primary/30 rounded"
                     />
@@ -257,7 +251,7 @@ export function ExpenseGrid({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           { label: "Mileage km", value: `${totals.totalMileageKm.toFixed(1)}km` },
-          { label: "Mileage cost", value: formatCurrency(totals.totalMileageCostClaimed) },
+          { label: "Mileage cost", value: formatCurrency(totals.totalMileageCost) },
           { label: "Lodging", value: formatCurrency(totals.totalLodging) },
           { label: "Meals", value: formatCurrency(totals.totalMeals) },
           { label: "Other", value: formatCurrency(totals.totalOther) },

@@ -229,7 +229,7 @@ export function MiniCalendar({ userId }: Props) {
           .select("id,year,month,week_number,timesheet_rows(sun,mon,tue,wed,thu,fri,sat)")
           .eq("employee_id", userId).eq("year", y).eq("month", m),
         (supabase.from as any)("expense_entries")
-          .select("entry_date,mileage_cost_claimed,lodging_amount,breakfast_amount,lunch_amount,dinner_amount,other_amount,expense_reports(id,destination)")
+          .select("entry_date,mileage_cost,lodging_amount,breakfast_amount,lunch_amount,dinner_amount,other_amount,expense_reports(id,destination)")
           .gte("entry_date", s0).lte("entry_date", s1),
       ]);
       if (ac.signal.aborted) return;
@@ -242,7 +242,7 @@ export function MiniCalendar({ userId }: Props) {
         if (!a.timesheetId) a.timesheetId = id;
       }
       for (const entry of (exRes.data ?? [])) {
-        const total = [entry.mileage_cost_claimed, entry.lodging_amount,
+        const total = [entry.mileage_cost, entry.lodging_amount,
           entry.breakfast_amount, entry.lunch_amount, entry.dinner_amount, entry.other_amount,
         ].reduce((s: number, v: any) => s + Number(v ?? 0), 0);
         const rpt = Array.isArray(entry.expense_reports) ? entry.expense_reports[0] : entry.expense_reports;

@@ -108,24 +108,15 @@ export async function syncExpenseReportToSharePoint(reportId: string): Promise<v
     .eq("id", r.employee_id)
     .single();
 
-  const { data: mileageRate } = await db
-    .from("mileage_rate_config")
-    .select("rate_per_km")
-    .eq("employee_id", r.employee_id)
-    .eq("year", r.year)
-    .single();
-
-  const ratePerKm = mileageRate?.rate_per_km ?? 0;
-
   const { data: entries } = await db
     .from("expense_entries")
-    .select("day_index, mileage_km, mileage_cost_claimed, lodging_amount, breakfast_amount, lunch_amount, dinner_amount, other_amount, travel_from, travel_to, notes")
+    .select("day_index, mileage_km, mileage_cost, lodging_amount, breakfast_amount, lunch_amount, dinner_amount, other_amount, travel_from, travel_to, notes")
     .eq("report_id", reportId)
     .order("day_index");
 
   const csvRows = (entries ?? []).map((e: any) => {
     const daily =
-      (e.mileage_cost_claimed ?? 0) +
+      (e.mileage_cost ?? 0) +
       (e.lodging_amount ?? 0) +
       (e.breakfast_amount ?? 0) +
       (e.lunch_amount ?? 0) +
@@ -143,8 +134,7 @@ export async function syncExpenseReportToSharePoint(reportId: string): Promise<v
       destination: r.destination ?? "",
       day: DAY_NAMES[e.day_index] ?? e.day_index,
       mileage_km: e.mileage_km ?? 0,
-      mileage_rate: ratePerKm,
-      mileage_claimed: e.mileage_cost_claimed ?? 0,
+      mileage_cost: e.mileage_cost ?? 0,
       lodging: e.lodging_amount ?? 0,
       breakfast: e.breakfast_amount ?? 0,
       lunch: e.lunch_amount ?? 0,
