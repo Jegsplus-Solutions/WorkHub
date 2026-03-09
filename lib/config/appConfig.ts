@@ -49,17 +49,21 @@ function createServiceClient() {
  * for any key with an empty DB value. Server-only.
  */
 export async function getAppConfig(): Promise<AppConfig> {
-  const supabase = createServiceClient();
-
-  const { data: rows } = await supabase
-    .from("app_config")
-    .select("key, value");
-
   const dbValues = new Map<string, string>();
-  if (rows) {
-    for (const row of rows as { key: string; value: string }[]) {
-      if (row.value) dbValues.set(row.key, row.value);
+
+  try {
+    const supabase = createServiceClient();
+    const { data: rows, error } = await supabase
+      .from("app_config")
+      .select("key, value");
+
+    if (!error && rows) {
+      for (const row of rows as { key: string; value: string }[]) {
+        if (row.value) dbValues.set(row.key, row.value);
+      }
     }
+  } catch {
+    // DB not available or table missing — fall back to env vars
   }
 
   const config: Record<string, string> = {};
@@ -75,16 +79,19 @@ export async function getAppConfig(): Promise<AppConfig> {
  * Get a single config value by DB key name.
  */
 export async function getConfigValue(key: string): Promise<string> {
-  const supabase = createServiceClient();
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+      .from("app_config")
+      .select("value")
+      .eq("key", key)
+      .single();
 
-  const { data } = await supabase
-    .from("app_config")
-    .select("value")
-    .eq("key", key)
-    .single();
-
-  const row = data as { value: string } | null;
-  if (row?.value) return row.value;
+    const row = data as { value: string } | null;
+    if (!error && row?.value) return row.value;
+  } catch {
+    // DB not available or table missing — fall back to env var
+  }
 
   const envVar = ENV_FALLBACKS[key];
   return envVar ? (process.env[envVar] ?? "") : "";
