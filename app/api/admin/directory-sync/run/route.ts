@@ -58,6 +58,12 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 export async function POST() {
+  // Diagnostic: log env var presence
+  const srkSet = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const srkLen = process.env.SUPABASE_SERVICE_ROLE_KEY?.length ?? 0;
+  const urlSet = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+  console.log(`[sync] ENV CHECK — URL set: ${urlSet}, SERVICE_ROLE_KEY set: ${srkSet}, length: ${srkLen}`);
+
   const adminDb: any = createServiceClient();
   let runId: string | null = null;
 
@@ -78,12 +84,16 @@ export async function POST() {
       return NextResponse.json({ error: "Admin role required" }, { status: 403 });
     }
 
+    console.log("[sync] Auth passed, inserting run record...");
     const { data: run, error: runErr } = await adminDb
       .from("directory_sync_runs")
       .insert({ status: "running" } as any)
       .select("id")
       .single();
-    if (runErr || !run) throw new Error(runErr?.message ?? "Failed to create run record");
+    if (runErr || !run) {
+      console.error("[sync] Run insert failed:", runErr?.message, runErr?.code);
+      throw new Error(runErr?.message ?? "Failed to create run record");
+    }
     runId = run.id;
 
     const appConfig = await getAppConfig();
