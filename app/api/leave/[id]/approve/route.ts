@@ -1,7 +1,7 @@
 /**
- * POST /api/expenses/[id]/reject
+ * POST /api/leave/[id]/approve
  *
- * Rejects an expense report with a required reason.
+ * Approves a leave request (manager → manager_approved, finance/admin → approved).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -11,7 +11,7 @@ import { writeAudit } from "@/lib/server/audit";
 import { assertCanManagerAct } from "@/lib/server/workflow";
 
 const BodySchema = z.object({
-  managerComments: z.string().min(1, "Rejection reason is required").max(5000),
+  managerComments: z.string().max(5000).optional(),
 });
 
 export async function POST(
@@ -23,51 +23,54 @@ export async function POST(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const { id: reportId } = await params;
-    if (!reportId) return NextResponse.json({ error: "Missing report id in path" }, { status: 400 });
+    const role = await getCurrentUserRole();
+    if (!["manager", "admin", "finance"].includes(role)) {
+      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    }
+
+    const { id: leaveId } = await params;
+    if (!leaveId) return NextResponse.json({ error: "Missing leave request id" }, { status: 400 });
 
     const body = await req.json().catch(() => ({}));
     const { managerComments } = BodySchema.parse(body);
 
-    const { data: r, error: rErr }: any = await supabase
-      .from("expense_reports")
+    const { data: lr, error: lrErr }: any = await supabase
+      .from("leave_requests")
       .select("id, employee_id, manager_id, status")
-      .eq("id", reportId)
+      .eq("id", leaveId)
       .single();
 
-    if (rErr || !r) return NextResponse.json({ error: "Expense report not found" }, { status: 404 });
+    if (lrErr || !lr) return NextResponse.json({ error: "Leave request not found" }, { status: 404 });
 
-    assertCanManagerAct(r.status as any);
+    assertCanManagerAct(lr.status);
 
-    const role = await getCurrentUserRole();
-    const newStatus = role === "manager" ? "manager_rejected" : "rejected";
-
+    const newStatus = role === "manager" ? "manager_approved" : "approved";
     const adminDb: any = createServiceClient();
     const { data: updated, error: uErr } = await adminDb
-      .from("expense_reports")
+      .from("leave_requests")
       .update({
         status: newStatus,
-        manager_comments: managerComments,
-        rejected_at: new Date().toISOString(),
-        approved_at: null,
+        manager_comments: managerComments ?? null,
+        approved_at: new Date().toISOString(),
+        rejected_at: null,
       })
-      .eq("id", reportId)
+      .eq("id", leaveId)
       .select()
       .single();
 
     if (uErr) return NextResponse.json({ error: uErr.message }, { status: 400 });
 
     await writeAudit({
-      actorUserId: r.manager_id ?? null,
-      entityType: "expense_report",
-      entityId: reportId,
-      action: "reject",
+      actorUserId: user.id,
+      entityType: "leave_request",
+      entityId: leaveId,
+      action: "approve",
       comment: managerComments,
-      beforeJson: r,
+      beforeJson: lr,
       afterJson: updated,
     });
 
-    return NextResponse.json({ ok: true, report: updated });
+    return NextResponse.json({ ok: true, leaveRequest: updated });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 400 });
   }

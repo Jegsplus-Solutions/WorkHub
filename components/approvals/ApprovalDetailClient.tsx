@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { format } from "date-fns";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +32,6 @@ export function ApprovalDetailClient({
   userRole,
 }: ApprovalDetailClientProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [status, setStatus] = useState(data.status);
   const [processing, setProcessing] = useState(false);
   const [rejectionText, setRejectionText] = useState("");
@@ -64,22 +62,23 @@ export function ApprovalDetailClient({
       ? "leave_request"
       : "expense_report";
 
+  const apiBase =
+    type === "timesheet"
+      ? `/api/timesheets/${data.id}`
+      : type === "leave"
+      ? `/api/leave/${data.id}`
+      : `/api/expenses/${data.id}`;
+
   async function handleApprove() {
     setProcessing(true);
     try {
-      await (supabase.from as any)(table)
-        .update({
-          status: approveStatus,
-          approved_at: new Date().toISOString(),
-        })
-        .eq("id", data.id);
-
-      await (supabase.from as any)("audit_log").insert({
-        actor_user_id: userId,
-        entity_type: entityType,
-        entity_id: data.id,
-        action: "approve",
+      const res = await fetch(`${apiBase}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
       });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Approval failed");
 
       setStatus(approveStatus);
       toast({
@@ -106,21 +105,13 @@ export function ApprovalDetailClient({
     if (!rejectionText.trim()) return;
     setProcessing(true);
     try {
-      await (supabase.from as any)(table)
-        .update({
-          status: rejectStatus,
-          rejected_at: new Date().toISOString(),
-          manager_comments: rejectionText,
-        })
-        .eq("id", data.id);
-
-      await (supabase.from as any)("audit_log").insert({
-        actor_user_id: userId,
-        entity_type: entityType,
-        entity_id: data.id,
-        action: "reject",
-        comment: rejectionText,
+      const res = await fetch(`${apiBase}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ managerComments: rejectionText }),
       });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Rejection failed");
 
       setStatus(rejectStatus);
       setShowRejectModal(false);

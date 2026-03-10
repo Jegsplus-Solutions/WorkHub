@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 export interface Toast {
   id: string;
@@ -11,7 +11,7 @@ export interface Toast {
 }
 
 let toastCount = 0;
-const listeners: Array<(toasts: Toast[]) => void> = [];
+const listeners = new Set<(toasts: Toast[]) => void>();
 let toasts: Toast[] = [];
 
 function notify() {
@@ -33,10 +33,10 @@ export function toast(props: Omit<Toast, "id">) {
 export function useToast() {
   const [state, setState] = useState<Toast[]>(toasts);
 
-  // Subscribe on mount
-  if (!listeners.includes(setState as (t: Toast[]) => void)) {
-    listeners.push(setState as (t: Toast[]) => void);
-  }
+  useEffect(() => {
+    listeners.add(setState);
+    return () => { listeners.delete(setState); };
+  }, []);
 
   const dismiss = useCallback((id: string) => {
     toasts = toasts.filter((t) => t.id !== id);

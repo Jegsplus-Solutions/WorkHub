@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createServiceClient, getCurrentUserRole } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/server/audit";
 import { assertCanManagerAct } from "@/lib/server/workflow";
 import { syncExpenseReportToSharePoint } from "@/lib/server/sharepoint/sync";
@@ -40,11 +40,14 @@ export async function POST(
 
     assertCanManagerAct(r.status as any);
 
+    const role = await getCurrentUserRole();
+    const newStatus = role === "manager" ? "manager_approved" : "approved";
+
     const adminDb: any = createServiceClient();
     const { data: updated, error: uErr } = await adminDb
       .from("expense_reports")
       .update({
-        status: "approved",
+        status: newStatus,
         manager_comments: managerComments ?? null,
         approved_at: new Date().toISOString(),
         rejected_at: null,

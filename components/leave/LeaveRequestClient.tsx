@@ -174,19 +174,15 @@ export function LeaveRequestClient({
 
   async function handleApprove() {
     setSaving(true);
-    const newStatus = userRole === "manager" ? "manager_approved" : "approved";
     try {
-      await (supabase.from as any)("leave_requests")
-        .update({ status: newStatus, approved_at: new Date().toISOString() })
-        .eq("id", leaveId!);
-
-      await (supabase.from as any)("audit_log").insert({
-        actor_user_id: userId,
-        entity_type: "leave_request",
-        entity_id: leaveId,
-        action: "approve",
+      const res = await fetch(`/api/leave/${leaveId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
       });
-
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Approval failed");
+      const newStatus = userRole === "manager" ? "manager_approved" : "approved";
       setStatus(newStatus);
       toast({ title: newStatus === "manager_approved" ? "Sent for final approval" : "Leave approved", variant: "success" });
       router.refresh();
@@ -200,24 +196,15 @@ export function LeaveRequestClient({
   async function handleReject() {
     if (!rejectionText.trim()) return;
     setSaving(true);
-    const newStatus = userRole === "manager" ? "manager_rejected" : "rejected";
     try {
-      await (supabase.from as any)("leave_requests")
-        .update({
-          status: newStatus,
-          rejected_at: new Date().toISOString(),
-          manager_comments: rejectionText,
-        })
-        .eq("id", leaveId!);
-
-      await (supabase.from as any)("audit_log").insert({
-        actor_user_id: userId,
-        entity_type: "leave_request",
-        entity_id: leaveId,
-        action: "reject",
-        comment: rejectionText,
+      const res = await fetch(`/api/leave/${leaveId}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ managerComments: rejectionText }),
       });
-
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Rejection failed");
+      const newStatus = userRole === "manager" ? "manager_rejected" : "rejected";
       setStatus(newStatus);
       setShowRejectModal(false);
       toast({ title: "Leave request rejected", variant: "destructive" });
@@ -233,9 +220,10 @@ export function LeaveRequestClient({
     if (!leaveId) return;
     setSaving(true);
     try {
-      await (supabase.from as any)("leave_requests")
+      const { error: recallErr } = await (supabase.from as any)("leave_requests")
         .update({ status: "draft", submitted_at: null })
         .eq("id", leaveId);
+      if (recallErr) throw recallErr;
 
       await (supabase.from as any)("audit_log").insert({
         actor_user_id: userId,
@@ -280,8 +268,8 @@ export function LeaveRequestClient({
                 </button>
                 <button
                   onClick={() => save("submitted")}
-                  disabled={saving || !validation.valid}
-                  title={!validation.valid ? "Fix errors before submitting" : ""}
+                  disabled={saving || !validation.valid || !selectedManager}
+                  title={!selectedManager ? "Select a manager before submitting" : !validation.valid ? "Fix errors before submitting" : ""}
                   className="flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
                   <Send className="w-4 h-4" />

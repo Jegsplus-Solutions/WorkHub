@@ -6,7 +6,6 @@ import { CheckCircle, XCircle, Clock, Receipt, CalendarX2, ExternalLink, Chevron
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { format } from "date-fns";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 interface ApprovalItem {
@@ -28,7 +27,6 @@ interface ApprovalsInboxProps {
 
 export function ApprovalsInbox({ items: initialItems, managerId, userRole }: ApprovalsInboxProps) {
   const router = useRouter();
-  const supabase = createClient();
   const [items, setItems] = useState(initialItems);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [activeItem, setActiveItem] = useState<ApprovalItem | null>(items[0] ?? null);
@@ -54,21 +52,13 @@ export function ApprovalsInbox({ items: initialItems, managerId, userRole }: App
     }
   }
 
-  async function writeAuditLog(id: string, entityType: "timesheet" | "expense_report" | "leave_request", action: string, comment?: string) {
-    await (supabase.from as any)("audit_log").insert({
-      actor_user_id: managerId,
-      entity_type: entityType,
-      entity_id: id,
-      action: action,
-      comment: comment ?? null,
-    });
-  }
-
-  // Manager → manager_approved; Finance/Admin → approved (final)
-  const approveStatus = userRole === "manager" ? "manager_approved" : "approved";
-  // Manager → manager_rejected; Finance/Admin → rejected (final)
-  const rejectStatus = userRole === "manager" ? "manager_rejected" : "rejected";
   const approveLabel = userRole === "manager" ? "Manager approved" : "Approved";
+
+  function apiBase(item: ApprovalItem) {
+    if (item.type === "timesheet") return `/api/timesheets/${item.id}`;
+    if (item.type === "leave") return `/api/leave/${item.id}`;
+    return `/api/expenses/${item.id}`;
+  }
 
   async function approveItems(ids: string[]) {
     setProcessing(true);
@@ -78,14 +68,13 @@ export function ApprovalsInbox({ items: initialItems, managerId, userRole }: App
         const item = items.find((i) => i.id === id);
         if (!item) continue;
 
-        const table = item.type === "timesheet" ? "timesheets" : item.type === "leave" ? "leave_requests" : "expense_reports";
-        const entityType = item.type === "timesheet" ? "timesheet" : item.type === "leave" ? "leave_request" : "expense_report";
-
-        await (supabase.from as any)(table)
-          .update({ status: approveStatus, approved_at: new Date().toISOString() })
-          .eq("id", id);
-
-        await writeAuditLog(id, entityType as any, "approve");
+        const res = await fetch(`${apiBase(item)}/approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Approval failed");
         successCount++;
       }
 
@@ -105,14 +94,14 @@ export function ApprovalsInbox({ items: initialItems, managerId, userRole }: App
       for (const id of ids) {
         const item = items.find((i) => i.id === id);
         if (!item) continue;
-        const table = item.type === "timesheet" ? "timesheets" : item.type === "leave" ? "leave_requests" : "expense_reports";
-        const entityType = item.type === "timesheet" ? "timesheet" : item.type === "leave" ? "leave_request" : "expense_report";
 
-        await (supabase.from as any)(table)
-          .update({ status: rejectStatus, rejected_at: new Date().toISOString(), manager_comments: reason })
-          .eq("id", id);
-
-        await writeAuditLog(id, entityType as any, "reject", reason);
+        const res = await fetch(`${apiBase(item)}/reject`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ managerComments: reason }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Rejection failed");
       }
 
       removeFromList(ids);

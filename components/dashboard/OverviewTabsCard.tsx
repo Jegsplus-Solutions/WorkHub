@@ -354,20 +354,16 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
   // ── Submit / Approve / Reject handlers (month-level) ──────────────────────
   async function handleSubmitMonth() {
     if (!userId || submitting) return;
+    // Block submit without a selected manager
+    if (!selectedManager) {
+      alert("Please select a manager before submitting.");
+      return;
+    }
     setSubmitting(true);
     try {
-      // Use manager selected from dropdown, fall back to employee_manager table
-      let managerId: string | null = selectedManager || null;
-      if (!managerId) {
-        const { data: emRow }: any = await (supabase as any)
-          .from("employee_manager")
-          .select("manager_id")
-          .eq("employee_id", userId)
-          .maybeSingle();
-        managerId = emRow?.manager_id ?? null;
-      }
+      const managerId: string | null = selectedManager;
 
-      const { data: existing }: any = await (supabase as any)
+      const { data: existing, error: existErr }: any = await (supabase as any)
         .from("timesheets")
         .select("id")
         .eq("employee_id", userId)
@@ -375,18 +371,20 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
         .eq("month", selectedMonth)
         .eq("week_number", 0)
         .maybeSingle();
+      if (existErr) throw existErr;
 
       const now = new Date().toISOString();
 
       if (existing?.id) {
-        await (supabase as any).from("timesheets").update({
+        const { error: upErr } = await (supabase as any).from("timesheets").update({
           status: "submitted",
           employee_notes: monthNotes || null,
           manager_id: managerId,
           submitted_at: now,
         }).eq("id", existing.id);
+        if (upErr) throw upErr;
       } else {
-        await (supabase as any).from("timesheets").insert({
+        const { error: insErr } = await (supabase as any).from("timesheets").insert({
           employee_id: userId,
           year: selectedYear,
           month: selectedMonth,
@@ -396,6 +394,7 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
           manager_id: managerId,
           submitted_at: now,
         });
+        if (insErr) throw insErr;
       }
 
       setLocalTimesheets(prev => {
@@ -419,10 +418,11 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
     if (!monthRecord?.id || submitting) return;
     setSubmitting(true);
     try {
-      await (supabase as any).from("timesheets").update({
+      const { error: recallErr } = await (supabase as any).from("timesheets").update({
         status: "draft",
         submitted_at: null,
       }).eq("id", monthRecord.id);
+      if (recallErr) throw recallErr;
 
       setLocalTimesheets(prev =>
         prev.map(t => t.id === monthRecord.id ? { ...t, status: "draft" } : t)
@@ -439,10 +439,16 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
     if (!monthRecord?.id || submitting) return;
     setSubmitting(true);
     try {
-      await (supabase as any).from("timesheets").update({
-        status: action,
-        manager_comments: approvalComment || null,
-      }).eq("id", monthRecord.id);
+      const endpoint = action === "approved" ? "approve" : "reject";
+      const body: any = {};
+      if (action === "rejected") body.managerComments = approvalComment || "Rejected";
+      const res = await fetch(`/api/timesheets/${monthRecord.id}/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Action failed");
 
       setLocalTimesheets(prev =>
         prev.map(t => t.id === monthRecord.id ? { ...t, status: action, manager_comments: approvalComment || null } : t)

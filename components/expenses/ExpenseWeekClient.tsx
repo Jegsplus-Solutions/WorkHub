@@ -235,13 +235,15 @@ export function ExpenseWeekClient({
 
   async function handleApprove() {
     setSaving(true);
-    // Manager → manager_approved; Finance/Admin → approved (final)
-    const newStatus = userRole === "manager" ? "manager_approved" : "approved";
     try {
-      await (supabase.from as any)("expense_reports")
-        .update({ status: newStatus, approved_at: new Date().toISOString() })
-        .eq("id", reportId!);
-      await writeAuditLog(reportId!, "approve");
+      const res = await fetch(`/api/expenses/${reportId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Approval failed");
+      const newStatus = userRole === "manager" ? "manager_approved" : "approved";
       setStatus(newStatus);
       toast({ title: userRole === "manager" ? "Sent for final approval" : "Expense claim approved", variant: "success" });
       router.refresh();
@@ -255,13 +257,15 @@ export function ExpenseWeekClient({
   async function handleReject() {
     if (!rejectionText.trim()) return;
     setSaving(true);
-    // Manager → manager_rejected; Finance/Admin → rejected (final)
-    const newStatus = userRole === "manager" ? "manager_rejected" : "rejected";
     try {
-      await (supabase.from as any)("expense_reports")
-        .update({ status: newStatus, rejected_at: new Date().toISOString(), manager_comments: rejectionText })
-        .eq("id", reportId!);
-      await writeAuditLog(reportId!, "reject", rejectionText);
+      const res = await fetch(`/api/expenses/${reportId}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ managerComments: rejectionText }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Rejection failed");
+      const newStatus = userRole === "manager" ? "manager_rejected" : "rejected";
       setStatus(newStatus);
       setShowRejectModal(false);
       toast({ title: "Expense claim rejected", variant: "destructive" });
@@ -277,7 +281,8 @@ export function ExpenseWeekClient({
     if (!reportId) return;
     setSaving(true);
     try {
-      await (supabase.from as any)("expense_reports").update({ status: "draft", submitted_at: null }).eq("id", reportId);
+      const { error: recallErr } = await (supabase.from as any)("expense_reports").update({ status: "draft", submitted_at: null }).eq("id", reportId);
+      if (recallErr) throw recallErr;
       await writeAuditLog(reportId, "update", "Recalled to draft");
       setStatus("draft");
       toast({ title: "Recalled to draft" });
@@ -329,7 +334,8 @@ export function ExpenseWeekClient({
               </button>
               <button
                 onClick={() => save("submitted")}
-                disabled={saving || !validation.valid}
+                disabled={saving || !validation.valid || !selectedManager}
+                title={!selectedManager ? "Select a manager before submitting" : !validation.valid ? "Fix errors before submitting" : ""}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" />

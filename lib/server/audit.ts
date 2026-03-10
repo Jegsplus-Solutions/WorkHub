@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 
-type AuditEntity = "timesheet" | "expense_report" | "sharepoint_sync" | "directory_sync" | "app_config";
+type AuditEntity = "timesheet" | "expense_report" | "leave_request" | "sharepoint_sync" | "directory_sync" | "app_config";
 type AuditAction =
   | "create"
   | "update"
