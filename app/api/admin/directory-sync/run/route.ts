@@ -106,17 +106,8 @@ export async function POST() {
 
     await updateProgress(adminDb, runId, "Fetching all users from Entra ID...");
     const users = await fetchAllUsers();
-    await updateProgress(adminDb, runId, `Fetched ${users.length} users. Looking up managers...`);
 
-    const managerPairs = await mapWithConcurrency(
-      users,
-      MANAGER_LOOKUP_CONCURRENCY,
-      async (u) => ({ userAzureId: u.id, managerAzureId: await fetchManagerIdForUser(u.id) })
-    );
-    const managerMap = new Map<string, string | null>();
-    for (const p of managerPairs) managerMap.set(p.userAzureId, p.managerAzureId);
-
-    // Upsert all Entra users into directory_members (full org directory)
+    // Upsert all Entra users into directory_members first (no manager lookup needed yet)
     await updateProgress(adminDb, runId, `Syncing ${users.length} users to directory...`);
     const dirRows = users.map((u) => ({
       azure_user_id: u.id,
@@ -126,7 +117,6 @@ export async function POST() {
       department: u.department ?? null,
       office_location: u.officeLocation ?? null,
       employee_id: u.employeeId ?? null,
-      manager_azure_id: managerMap.get(u.id) ?? null,
       synced_at: new Date().toISOString(),
     }));
     for (const batch of chunk(dirRows, 500)) {
@@ -238,20 +228,39 @@ export async function POST() {
       }
     });
 
-    await updateProgress(adminDb, runId, "Syncing manager relationships...");
-    // Upsert employee_manager relationships
-    const managerRows: Array<{ employee_id: string; manager_id: string | null }> = [];
-    for (const [userAzureId, mgrAzureId] of managerMap.entries()) {
-      const emp = profileByAzureId.get(userAzureId);
-      if (!emp) continue;
-      const mgr = mgrAzureId ? profileByAzureId.get(mgrAzureId) : null;
-      managerRows.push({ employee_id: emp.id, manager_id: mgr?.id ?? null });
-    }
-    if (managerRows.length) {
-      const { error } = await adminDb
-        .from("employee_manager")
-        .upsert(managerRows, { onConflict: "employee_id" });
-      if (error) throw new Error(error.message);
+    // Look up managers only for users who have profiles (much smaller set)
+    const profileAzureIds = Array.from(profileByAzureId.keys());
+    let managerLinksCount = 0;
+    if (profileAzureIds.length > 0) {
+      await updateProgress(adminDb, runId, `Looking up managers for ${profileAzureIds.length} app users...`);
+      const managerPairs = await mapWithConcurrency(
+        profileAzureIds,
+        MANAGER_LOOKUP_CONCURRENCY,
+        async (azureId) => ({ userAzureId: azureId, managerAzureId: await fetchManagerIdForUser(azureId) })
+      );
+
+      const managerRows: Array<{ employee_id: string; manager_id: string | null }> = [];
+      for (const pair of managerPairs) {
+        const emp = profileByAzureId.get(pair.userAzureId);
+        if (!emp) continue;
+        const mgr = pair.managerAzureId ? profileByAzureId.get(pair.managerAzureId) : null;
+        managerRows.push({ employee_id: emp.id, manager_id: mgr?.id ?? null });
+
+        // Also update directory_members with the manager azure ID
+        if (pair.managerAzureId) {
+          await adminDb
+            .from("directory_members")
+            .update({ manager_azure_id: pair.managerAzureId } as any)
+            .eq("azure_user_id", pair.userAzureId);
+        }
+      }
+      if (managerRows.length) {
+        const { error } = await adminDb
+          .from("employee_manager")
+          .upsert(managerRows, { onConflict: "employee_id" });
+        if (error) throw new Error(error.message);
+      }
+      managerLinksCount = managerRows.length;
     }
 
     await updateProgress(adminDb, runId, "Syncing role assignments...");
@@ -305,7 +314,7 @@ export async function POST() {
         finished_at: new Date().toISOString(),
         users_fetched: users.length,
         profiles_updated: profileUpdates.length,
-        manager_links_upserted: managerRows.length,
+        manager_links_upserted: managerLinksCount,
         role_grants_upserted: roleRowsToUpsert.length,
         roles_removed: rolesRemoved,
         progress_status: "Complete",
@@ -318,7 +327,7 @@ export async function POST() {
       entityType: "directory_sync",
       entityId: runId,
       action: "sync_success",
-      comment: `Users=${users.length}, profiles=${profileUpdates.length}, photos=${photosSynced}, managers=${managerRows.length}, roleGrants=${roleRowsToUpsert.length}, rolesRemoved=${rolesRemoved}`,
+      comment: `Users=${users.length}, profiles=${profileUpdates.length}, photos=${photosSynced}, managers=${managerLinksCount}, roleGrants=${roleRowsToUpsert.length}, rolesRemoved=${rolesRemoved}`,
     });
 
     return NextResponse.json({
@@ -327,7 +336,7 @@ export async function POST() {
       usersFetched: users.length,
       profilesUpdated: profileUpdates.length,
       photosSynced,
-      managerLinksUpserted: managerRows.length,
+      managerLinksUpserted: managerLinksCount,
       roleGrantsUpserted: roleRowsToUpsert.length,
       rolesRemoved,
       managerLookupConcurrency: MANAGER_LOOKUP_CONCURRENCY,
