@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -74,6 +74,72 @@ interface Props {
   userRole?: "employee" | "manager" | "admin" | "finance";
   userId?: string;
   managers?: ManagerOption[];
+}
+
+function ManagerCombobox({ managers, value, onChange }: { managers: ManagerOption[]; value: string; onChange: (id: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selected = managers.find((m) => m.id === value);
+  const filtered = useMemo(() => {
+    if (!query) return managers;
+    const q = query.toLowerCase();
+    return managers.filter((m) => m.display_name.toLowerCase().includes(q));
+  }, [managers, query]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-1.5" ref={ref}>
+      <span className="text-sm font-bold text-gray-800">Manager</span>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="Search manager…"
+          value={open ? query : (selected?.display_name ?? "")}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => { setOpen(true); setQuery(""); }}
+          className="rounded-lg border border-gray-200 bg-white pl-3 pr-8 py-1.5 text-sm text-gray-700 min-w-[200px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => { onChange(""); setQuery(""); }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+            title="Clear"
+          >
+            ✕
+          </button>
+        )}
+        {open && (
+          <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+            {filtered.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-gray-400">No matches</li>
+            ) : (
+              filtered.map((m) => (
+                <li
+                  key={m.id}
+                  onClick={() => { onChange(m.id); setQuery(""); setOpen(false); }}
+                  className={`px-3 py-2 text-sm cursor-pointer hover:bg-primary/10 ${m.id === value ? "bg-primary/5 font-medium text-primary" : "text-gray-700"}`}
+                >
+                  {m.display_name}
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function OverviewTabsCard({ year, month, week, realTimesheets, realExpenses, newExHref, userRole = "employee", userId, managers = [] }: Props) {
@@ -415,19 +481,11 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
             <option key={y} value={y}>{y}</option>
           ))}
         </select>
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-bold text-gray-800">Manager</span>
-          <select
-            value={selectedManager}
-            onChange={e => setSelectedManager(e.target.value)}
-            className="select-chevron rounded-lg border border-gray-200 bg-white pl-3 pr-10 py-1.5 text-sm text-gray-700 min-w-[180px] cursor-pointer focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-          >
-            <option value="">Select…</option>
-            {managers.map((m) => (
-              <option key={m.id} value={m.id}>{m.display_name}</option>
-            ))}
-          </select>
-        </div>
+        <ManagerCombobox
+          managers={managers}
+          value={selectedManager}
+          onChange={setSelectedManager}
+        />
         <div className="flex-1" />
         <button
           type="button"
