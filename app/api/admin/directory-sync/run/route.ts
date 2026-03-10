@@ -30,8 +30,12 @@ async function fetchAllUsers(): Promise<GraphUser[]> {
     "id", "displayName", "mail", "userPrincipalName",
     "jobTitle", "department", "officeLocation", "employeeId",
   ].join(",");
-  const url = `https://graph.microsoft.com/v1.0/users?$select=${encodeURIComponent(select)}&$top=999`;
-  return graphGetAllPages<{ value: GraphUser[]; "@odata.nextLink"?: string }>(url) as Promise<GraphUser[]>;
+  // Filter to only real person accounts: members (not guests), enabled, with a mailbox
+  const filter = "userType eq 'Member' and accountEnabled eq true";
+  const url = `https://graph.microsoft.com/v1.0/users?$select=${encodeURIComponent(select)}&$filter=${encodeURIComponent(filter)}&$top=999`;
+  const allUsers = await graphGetAllPages<{ value: GraphUser[]; "@odata.nextLink"?: string }>(url) as GraphUser[];
+  // Extra safety: exclude entries with no displayName AND no email (device/system objects)
+  return allUsers.filter((u) => u.displayName || u.mail || u.userPrincipalName);
 }
 
 async function fetchGroupMemberIds(groupId: string): Promise<Set<string>> {
