@@ -28,6 +28,14 @@ export default async function DirectoryPage() {
     if (data.length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
+  // Sort alphabetically — nulls/empty last
+  allMembers.sort((a, b) => {
+    const na = (a.display_name ?? "").toLowerCase();
+    const nb = (b.display_name ?? "").toLowerCase();
+    if (!na && nb) return 1;
+    if (na && !nb) return -1;
+    return na.localeCompare(nb);
+  });
   const members = allMembers;
 
   return (

@@ -74,6 +74,7 @@ interface Props {
   userRole?: "employee" | "manager" | "admin" | "finance";
   userId?: string;
   managers?: ManagerOption[];
+  defaultManagerId?: string;
 }
 
 function ManagerCombobox({ managers, value, onChange }: { managers: ManagerOption[]; value: string; onChange: (id: string) => void }) {
@@ -97,6 +98,9 @@ function ManagerCombobox({ managers, value, onChange }: { managers: ManagerOptio
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // Show first 50 results to avoid rendering thousands at once
+  const visible = filtered.slice(0, 50);
+
   return (
     <div className="flex items-center gap-1.5" ref={ref}>
       <span className="text-sm font-bold text-gray-800">Manager</span>
@@ -104,11 +108,12 @@ function ManagerCombobox({ managers, value, onChange }: { managers: ManagerOptio
         <input
           ref={inputRef}
           type="text"
-          placeholder="Search by name…"
+          placeholder={managers.length > 0 ? "Search by name…" : "No employees synced"}
+          disabled={managers.length === 0}
           value={open ? query : (selected?.display_name ?? "")}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onChange={(e) => { setQuery(e.target.value); if (!open) setOpen(true); }}
           onFocus={() => { setOpen(true); setQuery(""); }}
-          className="rounded-lg border border-gray-200 bg-white pl-3 pr-8 py-1.5 text-sm text-gray-700 min-w-[200px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+          className="rounded-lg border border-gray-200 bg-white pl-3 pr-8 py-1.5 text-sm text-gray-700 min-w-[200px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 disabled:opacity-50 disabled:cursor-not-allowed"
         />
         {value && (
           <button
@@ -120,20 +125,25 @@ function ManagerCombobox({ managers, value, onChange }: { managers: ManagerOptio
             ✕
           </button>
         )}
-        {open && (
+        {open && managers.length > 0 && (
           <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-            {filtered.length === 0 ? (
+            {visible.length === 0 ? (
               <li className="px-3 py-2 text-sm text-gray-400">No matches</li>
             ) : (
-              filtered.map((m) => (
-                <li
-                  key={m.id}
-                  onClick={() => { onChange(m.id); setQuery(""); setOpen(false); }}
-                  className={`px-3 py-2 text-sm cursor-pointer hover:bg-primary/10 ${m.id === value ? "bg-primary/5 font-medium text-primary" : "text-gray-700"}`}
-                >
-                  {m.display_name}
-                </li>
-              ))
+              <>
+                {visible.map((m) => (
+                  <li
+                    key={m.id}
+                    onClick={() => { onChange(m.id); setQuery(""); setOpen(false); }}
+                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-primary/10 ${m.id === value ? "bg-primary/5 font-medium text-primary" : "text-gray-700"}`}
+                  >
+                    {m.display_name}
+                  </li>
+                ))}
+                {filtered.length > 50 && (
+                  <li className="px-3 py-1.5 text-xs text-gray-400 text-center">Type to narrow {filtered.length} results…</li>
+                )}
+              </>
             )}
           </ul>
         )}
@@ -142,12 +152,12 @@ function ManagerCombobox({ managers, value, onChange }: { managers: ManagerOptio
   );
 }
 
-export function OverviewTabsCard({ year, month, week, realTimesheets, realExpenses, newExHref, userRole = "employee", userId, managers = [] }: Props) {
+export function OverviewTabsCard({ year, month, week, realTimesheets, realExpenses, newExHref, userRole = "employee", userId, managers = [], defaultManagerId = "" }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("Timesheets");
   const [activeWeek, setActiveWeek] = useState<number>(week);
   const [selectedMonth, setSelectedMonth] = useState<number>(month);
   const [selectedYear, setSelectedYear] = useState<number>(year);
-  const [selectedManager, setSelectedManager] = useState<string>("");
+  const [selectedManager, setSelectedManager] = useState<string>(defaultManagerId);
   const [selectedDay, setSelectedDay] = useState<number | null>(() => {
     const now = new Date();
     if (now.getFullYear() === year && now.getMonth() + 1 === month) return now.getDate();

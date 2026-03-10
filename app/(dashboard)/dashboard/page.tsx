@@ -212,6 +212,14 @@ export default async function DashboardPage() {
     .filter((m: any) => m.display_name)
     .map((m: any) => ({ id: m.profile_id ?? m.azure_user_id, display_name: m.display_name }));
 
+  // Get the employee's assigned manager
+  const { data: emRow }: any = await supabase
+    .from("employee_manager")
+    .select("manager_id")
+    .eq("employee_id", user.id)
+    .maybeSingle();
+  const defaultManagerId = emRow?.manager_id ?? "";
+
   const pendingEx = (pendingExRes.data ?? []) as any[];
   const pendingTs = (pendingTsRes.data ?? []) as any[];
   const pendingLeave = (pendingLeaveRes.data ?? []) as any[];
@@ -403,6 +411,7 @@ export default async function DashboardPage() {
               userRole={role as any}
               userId={user.id}
               managers={managers}
+              defaultManagerId={defaultManagerId}
             />
 
             <HoursChart monthlyHours={monthlyHours} year={year} />

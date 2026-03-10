@@ -66,6 +66,14 @@ export default async function TimesheetsPage() {
     .filter((m: any) => m.display_name)
     .map((m: any) => ({ id: m.profile_id ?? m.azure_user_id, display_name: m.display_name }));
 
+  // Get the employee's assigned manager from employee_manager table
+  const { data: emRow }: any = await supabase
+    .from("employee_manager")
+    .select("manager_id")
+    .eq("employee_id", user.id)
+    .maybeSingle();
+  const defaultManagerId = emRow?.manager_id ?? "";
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
       <div className="flex-1 overflow-y-auto" style={{ background: "#e8eaef" }}>
@@ -80,6 +88,7 @@ export default async function TimesheetsPage() {
             userRole={role}
             userId={user.id}
             managers={managers}
+            defaultManagerId={defaultManagerId}
           />
         </div>
       </div>
