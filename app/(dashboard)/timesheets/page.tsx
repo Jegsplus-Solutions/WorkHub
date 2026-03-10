@@ -46,6 +46,24 @@ export default async function TimesheetsPage() {
   const realExpenses = exRes.data ?? [];
   const newExHref = `/expenses/new?year=${year}&week=${String(week).padStart(2, "0")}`;
 
+  // Fetch managers from directory (users with manager/admin role)
+  const { data: managerRoles } = await supabase
+    .from("user_roles")
+    .select("user_id")
+    .in("role", ["manager", "admin"]);
+  const managerUserIds = (managerRoles ?? []).map((r: any) => r.user_id);
+  let managers: { id: string; display_name: string }[] = [];
+  if (managerUserIds.length > 0) {
+    const { data: mgrProfiles } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", managerUserIds)
+      .order("display_name");
+    managers = (mgrProfiles ?? [])
+      .filter((p: any) => p.display_name)
+      .map((p: any) => ({ id: p.id, display_name: p.display_name }));
+  }
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white">
       <div className="flex-1 overflow-y-auto" style={{ background: "#e8eaef" }}>
@@ -59,6 +77,7 @@ export default async function TimesheetsPage() {
             newExHref={newExHref}
             userRole={role}
             userId={user.id}
+            managers={managers}
           />
         </div>
       </div>

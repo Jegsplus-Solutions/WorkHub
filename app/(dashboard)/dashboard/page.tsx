@@ -192,6 +192,24 @@ export default async function DashboardPage() {
     if (m >= 0 && m < 12) monthlyHours[m] += hrs;
   }
 
+  // Fetch managers from directory (users with manager/admin role)
+  const { data: managerRoles } = await supabase
+    .from("user_roles")
+    .select("user_id")
+    .in("role", ["manager", "admin"]);
+  const managerUserIds = (managerRoles ?? []).map((r: any) => r.user_id);
+  let managers: { id: string; display_name: string }[] = [];
+  if (managerUserIds.length > 0) {
+    const { data: mgrProfiles } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", managerUserIds)
+      .order("display_name");
+    managers = (mgrProfiles ?? [])
+      .filter((p: any) => p.display_name)
+      .map((p: any) => ({ id: p.id, display_name: p.display_name }));
+  }
+
   const pendingEx = (pendingExRes.data ?? []) as any[];
   const pendingTs = (pendingTsRes.data ?? []) as any[];
   const pendingLeave = (pendingLeaveRes.data ?? []) as any[];
@@ -382,6 +400,7 @@ export default async function DashboardPage() {
               newExHref={newExHref}
               userRole={role as any}
               userId={user.id}
+              managers={managers}
             />
 
             <HoursChart monthlyHours={monthlyHours} year={year} />

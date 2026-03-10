@@ -59,6 +59,11 @@ const EXPENSE_CATS = [
 interface TsRow { id: string; week_number: number; status: string; month?: number; year?: number; employee_notes?: string | null; manager_comments?: string | null; }
 interface ExRow { id: string; week_number: number; year: number; status: string; }
 
+interface ManagerOption {
+  id: string;
+  display_name: string;
+}
+
 interface Props {
   year: number;
   month: number;
@@ -68,9 +73,10 @@ interface Props {
   newExHref: string;
   userRole?: "employee" | "manager" | "admin" | "finance";
   userId?: string;
+  managers?: ManagerOption[];
 }
 
-export function OverviewTabsCard({ year, month, week, realTimesheets, realExpenses, newExHref, userRole = "employee", userId }: Props) {
+export function OverviewTabsCard({ year, month, week, realTimesheets, realExpenses, newExHref, userRole = "employee", userId, managers = [] }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("Timesheets");
   const [activeWeek, setActiveWeek] = useState<number>(week);
   const [selectedMonth, setSelectedMonth] = useState<number>(month);
@@ -266,13 +272,16 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
     if (!userId || submitting) return;
     setSubmitting(true);
     try {
-      // Look up the employee's manager
-      const { data: emRow }: any = await (supabase as any)
-        .from("employee_manager")
-        .select("manager_id")
-        .eq("employee_id", userId)
-        .maybeSingle();
-      const managerId = emRow?.manager_id ?? null;
+      // Use manager selected from dropdown, fall back to employee_manager table
+      let managerId: string | null = selectedManager || null;
+      if (!managerId) {
+        const { data: emRow }: any = await (supabase as any)
+          .from("employee_manager")
+          .select("manager_id")
+          .eq("employee_id", userId)
+          .maybeSingle();
+        managerId = emRow?.manager_id ?? null;
+      }
 
       const { data: existing }: any = await (supabase as any)
         .from("timesheets")
@@ -414,6 +423,9 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
             className="select-chevron rounded-lg border border-gray-200 bg-white pl-3 pr-10 py-1.5 text-sm text-gray-700 min-w-[180px] cursor-pointer focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
           >
             <option value="">Select…</option>
+            {managers.map((m) => (
+              <option key={m.id} value={m.id}>{m.display_name}</option>
+            ))}
           </select>
         </div>
         <div className="flex-1" />
