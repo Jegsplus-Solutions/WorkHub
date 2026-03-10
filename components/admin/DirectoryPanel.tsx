@@ -1,60 +1,62 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Users, Building2, Shield, Search } from "lucide-react";
+import { Users, Building2, MapPin, Search } from "lucide-react";
 
-type Person = {
+type DirectoryMember = {
   id: string;
-  display_name: string | null;
+  azure_user_id: string;
   email: string | null;
-  department: string | null;
+  display_name: string | null;
   job_title: string | null;
-  avatar_url: string | null;
-  user_roles: { role: string }[];
-  employee_manager: { manager: { display_name: string | null } | null }[];
+  department: string | null;
+  office_location: string | null;
+  employee_id: string | null;
+  manager_azure_id: string | null;
+  profile_id: string | null;
+  synced_at: string;
 };
 
-const ROLE_COLORS: Record<string, string> = {
-  admin: "bg-red-100 text-red-700",
-  finance: "bg-emerald-100 text-emerald-700",
-  manager: "bg-blue-100 text-blue-700",
-};
-
-export default function DirectoryPanel({ people }: { people: Person[] }) {
+export default function DirectoryPanel({ members }: { members: DirectoryMember[] }) {
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
 
+  // Build a lookup for manager names
+  const nameByAzureId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of members) {
+      if (m.display_name) map.set(m.azure_user_id, m.display_name);
+    }
+    return map;
+  }, [members]);
+
   const departments = useMemo(() => {
     const set = new Set<string>();
-    for (const p of people) {
-      if (p.department) set.add(p.department);
+    for (const m of members) {
+      if (m.department) set.add(m.department);
     }
     return Array.from(set).sort();
-  }, [people]);
+  }, [members]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return people.filter((p) => {
-      if (deptFilter !== "all" && p.department !== deptFilter) return false;
+    return members.filter((m) => {
+      if (deptFilter !== "all" && m.department !== deptFilter) return false;
       if (!q) return true;
       return (
-        (p.display_name ?? "").toLowerCase().includes(q) ||
-        (p.email ?? "").toLowerCase().includes(q) ||
-        (p.department ?? "").toLowerCase().includes(q) ||
-        (p.job_title ?? "").toLowerCase().includes(q)
+        (m.display_name ?? "").toLowerCase().includes(q) ||
+        (m.email ?? "").toLowerCase().includes(q) ||
+        (m.department ?? "").toLowerCase().includes(q) ||
+        (m.job_title ?? "").toLowerCase().includes(q) ||
+        (m.office_location ?? "").toLowerCase().includes(q)
       );
     });
-  }, [people, search, deptFilter]);
+  }, [members, search, deptFilter]);
 
-  const roleCount = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const p of people) {
-      for (const r of p.user_roles) {
-        map[r.role] = (map[r.role] ?? 0) + 1;
-      }
-    }
-    return map;
-  }, [people]);
+  const appUserCount = useMemo(
+    () => members.filter((m) => m.profile_id).length,
+    [members]
+  );
 
   return (
     <div className="space-y-6">
@@ -64,10 +66,13 @@ export default function DirectoryPanel({ people }: { people: Person[] }) {
           <div className="flex items-center gap-2 mb-1">
             <Users className="w-4 h-4 text-primary" />
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Total Employees
+              Total in Directory
             </span>
           </div>
-          <p className="text-2xl font-bold">{people.length}</p>
+          <p className="text-2xl font-bold">{members.length}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {appUserCount} signed into app
+          </p>
         </div>
         <div className="p-4 rounded-2xl border border-border bg-card">
           <div className="flex items-center gap-2 mb-1">
@@ -80,22 +85,14 @@ export default function DirectoryPanel({ people }: { people: Person[] }) {
         </div>
         <div className="p-4 rounded-2xl border border-border bg-card">
           <div className="flex items-center gap-2 mb-1">
-            <Shield className="w-4 h-4 text-amber-500" />
+            <MapPin className="w-4 h-4 text-amber-500" />
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Roles Assigned
+              With Managers
             </span>
           </div>
-          <div className="flex items-center gap-3 mt-1">
-            {Object.entries(roleCount).map(([role, count]) => (
-              <span key={role} className="text-sm">
-                <span className="font-bold">{count}</span>{" "}
-                <span className="text-muted-foreground capitalize">{role}</span>
-              </span>
-            ))}
-            {Object.keys(roleCount).length === 0 && (
-              <span className="text-sm text-muted-foreground">None</span>
-            )}
-          </div>
+          <p className="text-2xl font-bold">
+            {members.filter((m) => m.manager_azure_id).length}
+          </p>
         </div>
       </div>
 
@@ -105,7 +102,7 @@ export default function DirectoryPanel({ people }: { people: Person[] }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search by name, email, department, or title..."
+            placeholder="Search by name, email, department, title, or location..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -127,7 +124,7 @@ export default function DirectoryPanel({ people }: { people: Person[] }) {
 
       {/* Results count */}
       <p className="text-xs text-muted-foreground">
-        Showing {filtered.length} of {people.length} employees
+        Showing {filtered.length} of {members.length} employees
       </p>
 
       {/* Table */}
@@ -142,7 +139,7 @@ export default function DirectoryPanel({ people }: { people: Person[] }) {
                 Department
               </th>
               <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Role
+                Location
               </th>
               <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Manager
@@ -153,57 +150,40 @@ export default function DirectoryPanel({ people }: { people: Person[] }) {
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                  No employees found.
+                  No employees found. Run a directory sync first.
                 </td>
               </tr>
             )}
-            {filtered.map((p) => {
-              const roles = p.user_roles.map((r) => r.role);
-              const managerName = p.employee_manager?.[0]?.manager?.display_name;
+            {filtered.map((m) => {
+              const managerName = m.manager_azure_id
+                ? nameByAzureId.get(m.manager_azure_id) ?? "—"
+                : "—";
               return (
-                <tr key={p.id} className="hover:bg-accent/30 transition-colors">
+                <tr key={m.id} className="hover:bg-accent/30 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      {p.avatar_url ? (
-                        <img
-                          src={p.avatar_url}
-                          alt=""
-                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-medium text-muted-foreground">
-                            {(p.display_name ?? "?").charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {(m.display_name ?? "?").charAt(0).toUpperCase()}
+                        </span>
+                      </div>
                       <div>
-                        <div className="font-medium">{p.display_name ?? "—"}</div>
-                        <div className="text-xs text-muted-foreground">{p.email ?? "—"}</div>
-                        {p.job_title && (
-                          <div className="text-xs text-muted-foreground">{p.job_title}</div>
+                        <div className="font-medium">
+                          {m.display_name ?? "—"}
+                          {m.profile_id && (
+                            <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" title="Signed into app" />
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{m.email ?? "—"}</div>
+                        {m.job_title && (
+                          <div className="text-xs text-muted-foreground">{m.job_title}</div>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{p.department ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {roles.length > 0 ? (
-                        roles.map((role) => (
-                          <span
-                            key={role}
-                            className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium capitalize ${ROLE_COLORS[role] ?? "bg-gray-100 text-gray-700"}`}
-                          >
-                            {role}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-xs text-muted-foreground">employee</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{managerName ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{m.department ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{m.office_location ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{managerName}</td>
                 </tr>
               );
             })}

@@ -116,6 +116,29 @@ export async function POST() {
     const managerMap = new Map<string, string | null>();
     for (const p of managerPairs) managerMap.set(p.userAzureId, p.managerAzureId);
 
+    // Upsert all Entra users into directory_members (full org directory)
+    await updateProgress(adminDb, runId, `Syncing ${users.length} users to directory...`);
+    const dirRows = users.map((u) => ({
+      azure_user_id: u.id,
+      email: (u.mail ?? u.userPrincipalName ?? "").toLowerCase().trim() || null,
+      display_name: u.displayName ?? null,
+      job_title: u.jobTitle ?? null,
+      department: u.department ?? null,
+      office_location: u.officeLocation ?? null,
+      employee_id: u.employeeId ?? null,
+      manager_azure_id: managerMap.get(u.id) ?? null,
+      synced_at: new Date().toISOString(),
+    }));
+    for (const batch of chunk(dirRows, 500)) {
+      const { error } = await adminDb
+        .from("directory_members")
+        .upsert(batch, { onConflict: "azure_user_id" });
+      if (error) throw new Error(`directory_members upsert: ${error.message}`);
+    }
+
+    // Link directory_members to profiles where email matches
+    await updateProgress(adminDb, runId, "Linking directory members to app profiles...");
+
     await updateProgress(adminDb, runId, `Matching ${users.length} users to existing profiles...`);
     const emails = users
       .map((u) => (u.mail ?? u.userPrincipalName ?? "").toLowerCase().trim())
@@ -159,6 +182,16 @@ export async function POST() {
     const { data: allProfiles, error: allProfilesErr } = await adminDb
       .from("profiles")
       .select("id, email, azure_user_id, avatar_url");
+
+    // Link directory_members.profile_id to profiles by azure_user_id
+    for (const p of allProfiles ?? []) {
+      if (p.azure_user_id) {
+        await adminDb
+          .from("directory_members")
+          .update({ profile_id: p.id } as any)
+          .eq("azure_user_id", p.azure_user_id);
+      }
+    }
     if (allProfilesErr) throw new Error(allProfilesErr.message);
 
     const profileByAzureId = new Map<string, { id: string; email: string; avatar_url: string | null }>();
