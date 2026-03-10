@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { ReceiptUpload } from "./ReceiptUpload";
 import { Save, Send, CheckCircle, XCircle, RotateCcw, Printer } from "lucide-react";
+import { ManagerCombobox, type ManagerOption } from "@/components/shared/ManagerCombobox";
 import { cn } from "@/lib/utils";
 import { addDays, format } from "date-fns";
 
@@ -30,6 +31,8 @@ interface ExpenseWeekClientProps {
   userName: string;
   userEmail: string;
   managerId?: string | null;
+  managers?: ManagerOption[];
+  defaultManagerId?: string;
   submittedAt?: string | null;
   approvedAt?: string | null;
   rejectedAt?: string | null;
@@ -53,6 +56,8 @@ export function ExpenseWeekClient({
   status: initialStatus,
   userRole,
   managerId,
+  managers = [],
+  defaultManagerId = "",
   managerComments,
   employeeNotes,
   destination: initialDestination,
@@ -69,6 +74,7 @@ export function ExpenseWeekClient({
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [notes, setNotes] = useState(employeeNotes ?? "");
   const [destination, setDestination] = useState(initialDestination ?? "");
+  const [selectedManager, setSelectedManager] = useState(managerId ?? defaultManagerId ?? "");
   const [receiptPaths, setReceiptPaths] = useState<Record<number, string | null>>({});
 
   // Load existing receipts from storage on mount
@@ -133,7 +139,7 @@ export function ExpenseWeekClient({
         const { data, error } = await (supabase.from as any)("expense_reports")
           .insert({
             employee_id: userId,
-            manager_id: managerId ?? null,
+            manager_id: selectedManager || managerId || null,
             year,
             week_number: weekNumber,
             week_beginning_date: weekBeginningDate,
@@ -200,6 +206,7 @@ export function ExpenseWeekClient({
         const { error: statusError } = await (supabase.from as any)("expense_reports")
           .update({
             status: newStatus,
+            manager_id: selectedManager || managerId || null,
             ...(newStatus === "submitted" ? { submitted_at: new Date().toISOString() } : {}),
           })
           .eq("id", rId);
@@ -365,9 +372,18 @@ export function ExpenseWeekClient({
         </div>
       )}
 
-      {/* Destination + notes fields */}
+      {/* Manager + Destination + notes fields */}
       {canEdit && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 no-print">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 no-print">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 block">Manager</label>
+            <ManagerCombobox
+              managers={managers}
+              value={selectedManager}
+              onChange={setSelectedManager}
+              label=""
+            />
+          </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Destination</label>
             <input

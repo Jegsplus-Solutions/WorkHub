@@ -1,4 +1,5 @@
-import { createServerSupabaseClient, getCurrentUserRole, createServiceClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, getCurrentUserRole } from "@/lib/supabase/server";
+import { fetchDepartmentManagers, resolveDefaultManager } from "@/lib/server/managers";
 import Link from "next/link";
 import { format, getISOWeek } from "date-fns";
 import type { Metadata } from "next";
@@ -192,51 +193,9 @@ export default async function DashboardPage() {
     if (m >= 0 && m < 12) monthlyHours[m] += hrs;
   }
 
-  // Fetch directory members in same department for manager search (paginate past 1000 limit)
-  const adminDb: any = createServiceClient();
-  const userDept = (realProfile?.department ?? "").toLowerCase().trim();
-  const allDir: any[] = [];
-  let dirFrom = 0;
-  while (true) {
-    let query = adminDb
-      .from("directory_members")
-      .select("azure_user_id, display_name, profile_id, department")
-      .not("display_name", "is", null)
-      .order("display_name")
-      .range(dirFrom, dirFrom + 999);
-    if (userDept) {
-      query = query.ilike("department", userDept);
-    }
-    const { data } = await query;
-    if (!data || data.length === 0) break;
-    allDir.push(...data);
-    if (data.length < 1000) break;
-    dirFrom += 1000;
-  }
-  const managers = allDir
-    .filter((m: any) => m.display_name && /^[a-zA-Z]/.test(m.display_name))
-    .map((m: any) => ({ id: m.profile_id ?? m.azure_user_id, display_name: m.display_name }));
-
-  // Get the employee's assigned manager — try employee_manager first, then directory_members
-  let defaultManagerId = "";
-  const { data: emRow }: any = await supabase
-    .from("employee_manager")
-    .select("manager_id")
-    .eq("employee_id", user.id)
-    .maybeSingle();
-  if (emRow?.manager_id) {
-    defaultManagerId = emRow.manager_id;
-  } else {
-    const { data: myDir }: any = await adminDb
-      .from("directory_members")
-      .select("manager_azure_id")
-      .eq("profile_id", user.id)
-      .maybeSingle();
-    if (myDir?.manager_azure_id) {
-      const mgr = allDir.find((m: any) => m.azure_user_id === myDir.manager_azure_id);
-      if (mgr) defaultManagerId = mgr.profile_id ?? mgr.azure_user_id;
-    }
-  }
+  // Fetch department managers and resolve default manager
+  const { managers, allDir } = await fetchDepartmentManagers(realProfile?.department ?? "");
+  const defaultManagerId = await resolveDefaultManager(supabase, user.id, allDir);
 
   const pendingEx = (pendingExRes.data ?? []) as any[];
   const pendingTs = (pendingTsRes.data ?? []) as any[];

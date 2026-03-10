@@ -18,6 +18,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ManagerCombobox, type ManagerOption } from "@/components/shared/ManagerCombobox";
 
 interface LeaveFormData {
   leaveType: string;
@@ -33,6 +34,8 @@ interface LeaveRequestClientProps {
   leaveId: string | null;
   userId: string;
   managerId: string | null;
+  managers?: ManagerOption[];
+  defaultManagerId?: string;
   status: string;
   userRole: string;
   managerComments?: string | null;
@@ -43,6 +46,8 @@ export function LeaveRequestClient({
   leaveId,
   userId,
   managerId,
+  managers = [],
+  defaultManagerId = "",
   status: initialStatus,
   userRole,
   managerComments,
@@ -52,6 +57,7 @@ export function LeaveRequestClient({
   const supabase = createClient();
   const [status, setStatus] = useState(initialStatus);
   const [saving, setSaving] = useState(false);
+  const [selectedManager, setSelectedManager] = useState(managerId ?? defaultManagerId ?? "");
   const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState<LeaveFormData>(initialData);
   const [rejectionText, setRejectionText] = useState("");
@@ -126,7 +132,7 @@ export function LeaveRequestClient({
         const { data, error } = await (supabase.from as any)("leave_requests")
           .insert({
             employee_id: userId,
-            manager_id: managerId,
+            manager_id: selectedManager || managerId || null,
             ...payload,
           })
           .select("id")
@@ -135,7 +141,7 @@ export function LeaveRequestClient({
         id = data.id;
       } else {
         const { error } = await (supabase.from as any)("leave_requests")
-          .update(payload)
+          .update({ ...payload, manager_id: selectedManager || managerId || null })
           .eq("id", id);
         if (error) throw error;
       }
@@ -337,6 +343,21 @@ export function LeaveRequestClient({
                 {e.message}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Manager */}
+        {canEdit && (
+          <div>
+            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1 block">
+              Manager
+            </label>
+            <ManagerCombobox
+              managers={managers}
+              value={selectedManager}
+              onChange={setSelectedManager}
+              label=""
+            />
           </div>
         )}
 

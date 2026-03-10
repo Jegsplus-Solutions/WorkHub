@@ -1,4 +1,5 @@
 import { createServerSupabaseClient, getCurrentUserRole } from "@/lib/supabase/server";
+import { fetchDepartmentManagers, resolveDefaultManager } from "@/lib/server/managers";
 import { notFound, redirect } from "next/navigation";
 import { TopBar } from "@/components/layout/TopBar";
 import { ExpenseWeekClient } from "@/components/expenses/ExpenseWeekClient";
@@ -39,13 +40,14 @@ export default async function ExpenseReportPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: managerRow }]: any[] = await Promise.all([
-    supabase.from("profiles").select("display_name, email").eq("id", user.id).single(),
-    supabase.from("employee_manager").select("manager_id").eq("employee_id", user.id).single(),
-  ]);
+  const { data: profile }: any = await supabase
+    .from("profiles").select("display_name, email, department").eq("id", user.id).single();
 
   const currentYear = new Date().getFullYear();
   const userRole = await getCurrentUserRole();
+
+  const { managers, allDir } = await fetchDepartmentManagers(profile?.department ?? "");
+  const defaultManagerId = await resolveDefaultManager(supabase, user.id, allDir);
 
   if (id === "new") {
     const year = parseInt(sp.year ?? String(currentYear));
@@ -81,7 +83,9 @@ export default async function ExpenseReportPage({
             userRole={userRole}
             userName={profile?.display_name ?? user.email ?? ""}
             userEmail={profile?.email ?? user.email ?? ""}
-            managerId={managerRow?.manager_id ?? null}
+            managerId={defaultManagerId || null}
+            managers={managers}
+            defaultManagerId={defaultManagerId}
             auditLog={[]}
           />
         </div>
@@ -153,7 +157,9 @@ export default async function ExpenseReportPage({
           userRole={userRole}
           userName={profile?.display_name ?? user.email ?? ""}
           userEmail={profile?.email ?? user.email ?? ""}
-          managerId={report.manager_id}
+          managerId={report.manager_id || defaultManagerId || null}
+          managers={managers}
+          defaultManagerId={defaultManagerId}
           submittedAt={report.submitted_at}
           approvedAt={report.approved_at}
           rejectedAt={report.rejected_at}

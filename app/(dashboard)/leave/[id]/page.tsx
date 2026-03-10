@@ -1,4 +1,5 @@
 import { createServerSupabaseClient, getCurrentUserRole } from "@/lib/supabase/server";
+import { fetchDepartmentManagers, resolveDefaultManager } from "@/lib/server/managers";
 import { notFound, redirect } from "next/navigation";
 import { TopBar } from "@/components/layout/TopBar";
 import { LeaveRequestClient } from "@/components/leave/LeaveRequestClient";
@@ -28,6 +29,11 @@ export default async function LeaveDetailPage({
 
   const userRole = await getCurrentUserRole();
 
+  const { data: profile }: any = await supabase
+    .from("profiles").select("department").eq("id", user.id).maybeSingle();
+  const { managers, allDir } = await fetchDepartmentManagers(profile?.department ?? "");
+  const defaultManagerId = await resolveDefaultManager(supabase, user.id, allDir);
+
   return (
     <div className="flex flex-col h-full">
       <TopBar title={`Leave Request — ${lr.leave_type}`} />
@@ -35,7 +41,9 @@ export default async function LeaveDetailPage({
         <LeaveRequestClient
           leaveId={lr.id}
           userId={user.id}
-          managerId={lr.manager_id}
+          managerId={lr.manager_id || defaultManagerId || null}
+          managers={managers}
+          defaultManagerId={defaultManagerId}
           status={lr.status}
           userRole={userRole}
           managerComments={lr.manager_comments}
