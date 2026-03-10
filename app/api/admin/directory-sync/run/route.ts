@@ -12,6 +12,8 @@ import { graphGet, graphGetAllPages, graphGetBinary } from "@/lib/server/graph/c
 import { mapWithConcurrency } from "@/lib/server/graph/concurrency";
 import { getAppConfig } from "@/lib/config/appConfig";
 
+export const maxDuration = 300; // 5 minutes — manager lookups for large orgs need time
+
 const MANAGER_LOOKUP_CONCURRENCY = Number(process.env.GRAPH_MANAGER_LOOKUP_CONCURRENCY ?? "10");
 
 type GraphUser = {
@@ -235,31 +237,46 @@ export async function POST() {
       }
     });
 
-    // Look up managers only for users who have profiles (much smaller set)
-    const profileAzureIds = Array.from(profileByAzureId.keys());
+    // Look up managers for ALL directory members so the directory shows each employee's manager
+    const allAzureIds = users.map((u) => u.id);
     let managerLinksCount = 0;
-    if (profileAzureIds.length > 0) {
-      await updateProgress(adminDb, runId, `Looking up managers for ${profileAzureIds.length} app users...`);
+    if (allAzureIds.length > 0) {
+      await updateProgress(adminDb, runId, `Looking up managers for ${allAzureIds.length} employees...`);
+      let looked = 0;
       const managerPairs = await mapWithConcurrency(
-        profileAzureIds,
+        allAzureIds,
         MANAGER_LOOKUP_CONCURRENCY,
-        async (azureId) => ({ userAzureId: azureId, managerAzureId: await fetchManagerIdForUser(azureId) })
+        async (azureId) => {
+          const result = { userAzureId: azureId, managerAzureId: await fetchManagerIdForUser(azureId) };
+          looked++;
+          if (looked % 200 === 0) {
+            await updateProgress(adminDb, runId, `Looking up managers... ${looked}/${allAzureIds.length}`);
+          }
+          return result;
+        }
       );
 
+      // Batch update directory_members with manager_azure_id
+      const mgrUpdates = managerPairs
+        .filter((p) => p.managerAzureId)
+        .map((p) => ({ azure_user_id: p.userAzureId, manager_azure_id: p.managerAzureId }));
+      for (const batch of chunk(mgrUpdates, 500)) {
+        for (const item of batch) {
+          await adminDb
+            .from("directory_members")
+            .update({ manager_azure_id: item.manager_azure_id } as any)
+            .eq("azure_user_id", item.azure_user_id);
+        }
+      }
+      managerLinksCount = mgrUpdates.length;
+
+      // Also update employee_manager table for users who have app profiles
       const managerRows: Array<{ employee_id: string; manager_id: string | null }> = [];
       for (const pair of managerPairs) {
         const emp = profileByAzureId.get(pair.userAzureId);
         if (!emp) continue;
         const mgr = pair.managerAzureId ? profileByAzureId.get(pair.managerAzureId) : null;
         managerRows.push({ employee_id: emp.id, manager_id: mgr?.id ?? null });
-
-        // Also update directory_members with the manager azure ID
-        if (pair.managerAzureId) {
-          await adminDb
-            .from("directory_members")
-            .update({ manager_azure_id: pair.managerAzureId } as any)
-            .eq("azure_user_id", pair.userAzureId);
-        }
       }
       if (managerRows.length) {
         const { error } = await adminDb
@@ -267,7 +284,6 @@ export async function POST() {
           .upsert(managerRows, { onConflict: "employee_id" });
         if (error) throw new Error(error.message);
       }
-      managerLinksCount = managerRows.length;
     }
 
     await updateProgress(adminDb, runId, "Syncing role assignments...");
