@@ -58,11 +58,13 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 export async function POST() {
-  // Diagnostic: log env var presence
-  const srkSet = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const srkLen = process.env.SUPABASE_SERVICE_ROLE_KEY?.length ?? 0;
-  const urlSet = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
-  console.log(`[sync] ENV CHECK — URL set: ${urlSet}, SERVICE_ROLE_KEY set: ${srkSet}, length: ${srkLen}`);
+  // Diagnostic: log env var presence + partial values for verification
+  const srk = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+  console.log(`[sync] URL: "${url.substring(0, 30)}..." (${url.length})`);
+  console.log(`[sync] ANON_KEY starts: "${anon.substring(0, 20)}..." (${anon.length})`);
+  console.log(`[sync] SERVICE_ROLE_KEY starts: "${srk.substring(0, 20)}..." ends: "...${srk.substring(srk.length - 10)}" (${srk.length})`);
 
   const adminDb: any = createServiceClient();
   let runId: string | null = null;
