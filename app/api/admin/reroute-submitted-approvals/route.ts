@@ -1,36 +1,32 @@
 /**
  * POST /api/admin/reroute-submitted-approvals?override=false
- * Authorization: Bearer <supabase_access_token>
  *
- * Re-routes submitted timesheets and expense reports to the correct manager
- * based on the current employee_manager mapping.
- *
- * override=false (default): only updates records where manager_id is null/empty
- * override=true: updates all submitted records to the current manager
- *
- * Never touches approved/rejected records to preserve audit integrity.
+ * Re-routes submitted timesheets and expense reports to the correct manager.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getBearerToken } from "@/lib/server/http";
-import { supabaseAdmin, supabaseUser } from "@/lib/server/supabase";
+import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/server/audit";
 
 export async function POST(req: NextRequest) {
   try {
-    const token = getBearerToken(req);
-    if (!token) return NextResponse.json({ error: "Missing Bearer token" }, { status: 401 });
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const userDb = supabaseUser(token);
-    const { data: roleRows } = await userDb.from("user_roles").select("role").eq("role", "admin").limit(1);
+    const { data: roleRows } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .limit(1);
     if (!roleRows || roleRows.length === 0) return NextResponse.json({ error: "Admin role required" }, { status: 403 });
 
     const overrideExisting =
       (req.nextUrl.searchParams.get("override") ?? "false") === "true";
 
-    const db = supabaseAdmin();
+    const db: any = createServiceClient();
 
-    // Load employee→manager mapping
     const { data: mapRows, error: mapErr } = await db
       .from("employee_manager")
       .select("employee_id, manager_id");
@@ -39,7 +35,6 @@ export async function POST(req: NextRequest) {
     const managerByEmployee = new Map<string, string | null>();
     for (const r of mapRows ?? []) managerByEmployee.set(r.employee_id, r.manager_id);
 
-    // Re-route submitted timesheets
     const { data: ts, error: tsErr } = await db
       .from("timesheets")
       .select("id, employee_id, manager_id")
@@ -57,7 +52,6 @@ export async function POST(req: NextRequest) {
       if (!error) timesheetsRerouted++;
     }
 
-    // Re-route submitted expense reports
     const { data: ex, error: exErr } = await db
       .from("expense_reports")
       .select("id, employee_id, manager_id")

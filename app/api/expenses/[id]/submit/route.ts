@@ -1,29 +1,27 @@
 /**
  * POST /api/expenses/[id]/submit
- * Authorization: Bearer <supabase_access_token>
  *
  * Submits an expense report for manager approval.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getBearerToken } from "@/lib/server/http";
-import { supabaseAdmin, supabaseUser } from "@/lib/server/supabase";
+import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/server/audit";
 import { assertCanSubmit } from "@/lib/server/workflow";
 
 export async function POST(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const token = getBearerToken(req);
-    if (!token) return NextResponse.json({ error: "Missing Bearer token" }, { status: 401 });
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     const { id: reportId } = await params;
     if (!reportId) return NextResponse.json({ error: "Missing report id in path" }, { status: 400 });
 
-    const userDb = supabaseUser(token);
-    const { data: r, error: rErr } = await userDb
+    const { data: r, error: rErr }: any = await supabase
       .from("expense_reports")
       .select("id, employee_id, manager_id, status")
       .eq("id", reportId)
@@ -33,7 +31,7 @@ export async function POST(
 
     assertCanSubmit(r.status as any);
 
-    const adminDb = supabaseAdmin();
+    const adminDb: any = createServiceClient();
 
     let managerId = r.manager_id as string | null;
     if (!managerId) {

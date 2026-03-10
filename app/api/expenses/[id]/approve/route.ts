@@ -1,14 +1,12 @@
 /**
  * POST /api/expenses/[id]/approve
- * Authorization: Bearer <supabase_access_token>
  *
  * Approves an expense report and triggers SharePoint sync.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getBearerToken } from "@/lib/server/http";
-import { supabaseAdmin, supabaseUser } from "@/lib/server/supabase";
+import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/server/audit";
 import { assertCanManagerAct } from "@/lib/server/workflow";
 import { syncExpenseReportToSharePoint } from "@/lib/server/sharepoint/sync";
@@ -22,8 +20,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const token = getBearerToken(req);
-    if (!token) return NextResponse.json({ error: "Missing Bearer token" }, { status: 401 });
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
     const { id: reportId } = await params;
     if (!reportId) return NextResponse.json({ error: "Missing report id in path" }, { status: 400 });
@@ -31,8 +30,7 @@ export async function POST(
     const body = await req.json().catch(() => ({}));
     const { managerComments } = BodySchema.parse(body);
 
-    const userDb = supabaseUser(token);
-    const { data: r, error: rErr } = await userDb
+    const { data: r, error: rErr }: any = await supabase
       .from("expense_reports")
       .select("id, employee_id, manager_id, status")
       .eq("id", reportId)
@@ -42,7 +40,7 @@ export async function POST(
 
     assertCanManagerAct(r.status as any);
 
-    const adminDb = supabaseAdmin();
+    const adminDb: any = createServiceClient();
     const { data: updated, error: uErr } = await adminDb
       .from("expense_reports")
       .update({

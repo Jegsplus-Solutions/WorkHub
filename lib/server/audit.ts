@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "./supabase";
+import { createServiceClient } from "@/lib/supabase/server";
 
 type AuditEntity = "timesheet" | "expense_report" | "sharepoint_sync" | "directory_sync" | "app_config";
 type AuditAction =
@@ -19,7 +19,7 @@ export async function writeAudit(args: {
   beforeJson?: unknown;
   afterJson?: unknown;
 }): Promise<void> {
-  const db = supabaseAdmin();
+  const db: any = createServiceClient();
   const { error } = await db.from("audit_log").insert({
     actor_user_id: args.actorUserId,
     entity_type: args.entityType as any,

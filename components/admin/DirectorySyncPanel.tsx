@@ -5,7 +5,6 @@ import { RefreshCw, Users, Shield, CheckCircle, XCircle, Clock } from "lucide-re
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 interface SyncRun {
@@ -36,17 +35,12 @@ const STATUS_CONFIG: Record<string, { icon: typeof CheckCircle; className: strin
 export function DirectorySyncPanel({ runs, activeUserCount, roleMappingCount }: DirectorySyncPanelProps) {
   const [syncing, setSyncing] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
 
   async function handleSyncNow() {
     setSyncing(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error("Not authenticated");
-
       const res = await fetch("/api/admin/directory-sync/run", {
         method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       let result: any;
       try {

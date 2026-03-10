@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "../supabase";
+import { createServiceClient } from "@/lib/supabase/server";
 import { uploadCsvToSharePoint } from "./upload";
 
 function csvEscape(v: unknown): string {
@@ -21,7 +21,7 @@ const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // ─── Timesheet sync ───────────────────────────────────────────────────────────
 
 export async function syncTimesheetToSharePoint(timesheetId: string): Promise<void> {
-  const db = supabaseAdmin();
+  const db: any = createServiceClient();
 
   const { data: t, error: tErr } = await db
     .from("timesheets")
@@ -91,7 +91,7 @@ export async function syncTimesheetToSharePoint(timesheetId: string): Promise<vo
 // ─── Expense report sync ──────────────────────────────────────────────────────
 
 export async function syncExpenseReportToSharePoint(reportId: string): Promise<void> {
-  const db = supabaseAdmin();
+  const db: any = createServiceClient();
 
   const { data: r, error: rErr } = await db
     .from("expense_reports")

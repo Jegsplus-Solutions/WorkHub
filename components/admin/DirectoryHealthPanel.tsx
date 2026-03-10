@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Wand2, RouteOff, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { createClient } from "@/lib/supabase/client";
+
 import { cn } from "@/lib/utils";
 
 interface Metrics {
@@ -47,7 +47,6 @@ export function DirectoryHealthPanel({
   const [autoManaging, setAutoManaging] = useState(false);
   const [rerouting, setRerouting] = useState<false | "missing" | "override">(false);
   const router = useRouter();
-  const supabase = createClient();
 
   const m = metrics ?? {
     total_profiles: 0,
@@ -63,19 +62,11 @@ export function DirectoryHealthPanel({
   const pct = (num: number, den: number) =>
     den === 0 ? 0 : Math.round((num / den) * 100);
 
-  async function getToken() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) throw new Error("Not authenticated");
-    return session.access_token;
-  }
-
   async function handleAutoManagerRoles() {
     setAutoManaging(true);
     try {
-      const token = await getToken();
       const res = await fetch("/api/admin/auto-manager-roles?keepAdminAsManager=true", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
       });
       let result: any;
       try {
@@ -100,10 +91,8 @@ export function DirectoryHealthPanel({
   async function handleReroute(override: boolean) {
     setRerouting(override ? "override" : "missing");
     try {
-      const token = await getToken();
       const res = await fetch(`/api/admin/reroute-submitted-approvals?override=${override}`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
       });
       let result: any;
       try {

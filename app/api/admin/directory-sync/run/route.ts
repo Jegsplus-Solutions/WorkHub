@@ -1,18 +1,12 @@
 /**
  * POST /api/admin/directory-sync/run
- * Authorization: Bearer <supabase_access_token>
  *
- * Manually triggers a directory sync from Microsoft Entra ID:
- * - Upserts profiles (display_name, job_title, department, etc.)
- * - Upserts employee_manager relationships (concurrency-limited)
- * - Grants roles based on Entra group membership
- * - Removes roles no longer present (strict sync)
- * - Logs the run to directory_sync_runs
+ * Manually triggers a directory sync from Microsoft Entra ID.
+ * Requires admin role (checked via cookie-based session).
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { getBearerToken } from "@/lib/server/http";
-import { supabaseAdmin, supabaseUser } from "@/lib/server/supabase";
+import { NextResponse } from "next/server";
+import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/server/audit";
 import { graphGet, graphGetAllPages, graphGetBinary } from "@/lib/server/graph/client";
 import { mapWithConcurrency } from "@/lib/server/graph/concurrency";
@@ -63,21 +57,24 @@ function chunk<T>(arr: T[], size: number): T[][] {
   );
 }
 
-export async function POST(req: NextRequest) {
-  const adminDb = supabaseAdmin();
+export async function POST() {
+  const adminDb: any = createServiceClient();
   let runId: string | null = null;
 
   try {
-    const token = getBearerToken(req);
-    if (!token) return NextResponse.json({ error: "Missing Bearer token" }, { status: 401 });
+    // Auth: cookie-based session
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const userDb = supabaseUser(token);
-    const { data: roleRows, error: roleErr } = await userDb
+    // Check admin role
+    const { data: roleRows } = await supabase
       .from("user_roles")
       .select("role")
+      .eq("user_id", user.id)
       .eq("role", "admin")
       .limit(1);
-    if (roleErr || !roleRows || roleRows.length === 0) {
+    if (!roleRows || roleRows.length === 0) {
       return NextResponse.json({ error: "Admin role required" }, { status: 403 });
     }
 
@@ -234,7 +231,7 @@ export async function POST(req: NextRequest) {
       .in("role", ["admin", "finance", "manager"]);
     if (existingErr) throw new Error(existingErr.message);
 
-    const toRemove = (existingRoles ?? []).filter((r) => {
+    const toRemove = (existingRoles ?? []).filter((r: any) => {
       const want = desiredRoles.get(r.user_id as string);
       return !(want?.has(r.role as "admin" | "finance" | "manager") ?? false);
     });
@@ -249,7 +246,6 @@ export async function POST(req: NextRequest) {
       if (!error) rolesRemoved++;
     }
 
-    // Mark run success
     await adminDb
       .from("directory_sync_runs")
       .update({

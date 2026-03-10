@@ -1,32 +1,33 @@
 /**
  * POST /api/admin/auto-manager-roles?keepAdminAsManager=true
- * Authorization: Bearer <supabase_access_token>
  *
- * Grants the 'manager' role to every user who has >=1 direct report in
- * employee_manager, and removes it from users who have none
- * (unless they are also admin and keepAdminAsManager=true).
+ * Grants the 'manager' role to every user who has >=1 direct report,
+ * and removes it from users who have none.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getBearerToken } from "@/lib/server/http";
-import { supabaseAdmin, supabaseUser } from "@/lib/server/supabase";
+import { createServerSupabaseClient, createServiceClient } from "@/lib/supabase/server";
 import { writeAudit } from "@/lib/server/audit";
 
 export async function POST(req: NextRequest) {
   try {
-    const token = getBearerToken(req);
-    if (!token) return NextResponse.json({ error: "Missing Bearer token" }, { status: 401 });
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const userDb = supabaseUser(token);
-    const { data: roleRows } = await userDb.from("user_roles").select("role").eq("role", "admin").limit(1);
+    const { data: roleRows } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .limit(1);
     if (!roleRows || roleRows.length === 0) return NextResponse.json({ error: "Admin role required" }, { status: 403 });
 
     const keepAdminAsManager =
       (req.nextUrl.searchParams.get("keepAdminAsManager") ?? "true") === "true";
 
-    const db = supabaseAdmin();
+    const db: any = createServiceClient();
 
-    // Who has >=1 direct report?
     const { data: emRows, error: emErr } = await db
       .from("employee_manager")
       .select("manager_id, employee_id");
@@ -39,23 +40,20 @@ export async function POST(req: NextRequest) {
     }
     const managersByOrg = new Set(reportCountByManager.keys());
 
-    // Existing manager role holders
     const { data: existingManagerRoles, error: existingErr } = await db
       .from("user_roles")
       .select("user_id")
       .eq("role", "manager");
     if (existingErr) return NextResponse.json({ error: existingErr.message }, { status: 400 });
 
-    const existingManagers = new Set((existingManagerRoles ?? []).map((r) => r.user_id as string));
+    const existingManagers = new Set<string>((existingManagerRoles ?? []).map((r: any) => r.user_id as string));
 
-    // Optionally protect admins from losing their manager role
     const adminIds = new Set<string>();
     if (keepAdminAsManager) {
       const { data: admins } = await db.from("user_roles").select("user_id").eq("role", "admin");
       for (const a of admins ?? []) adminIds.add(a.user_id as string);
     }
 
-    // Compute adds / removes
     const toAdd = Array.from(managersByOrg).filter((id) => !existingManagers.has(id));
     const toRemove = Array.from(existingManagers).filter(
       (id) => !managersByOrg.has(id) && !adminIds.has(id)

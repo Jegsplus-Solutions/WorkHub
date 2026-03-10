@@ -1,31 +1,25 @@
 /**
  * GET /api/admin/directory-sync/status
- * Authorization: Bearer <supabase_access_token>
  *
  * Returns the 30 most recent directory sync run records.
  * Accessible to admin and finance roles.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { getBearerToken } from "@/lib/server/http";
-import { supabaseUser } from "@/lib/server/supabase";
+import { NextResponse } from "next/server";
+import { createServerSupabaseClient, isFinanceOrAdmin } from "@/lib/supabase/server";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const token = getBearerToken(req);
-    if (!token) return NextResponse.json({ error: "Missing Bearer token" }, { status: 401 });
+    const supabase = await createServerSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-    const db = supabaseUser(token);
-
-    const { data: roles } = await db
-      .from("user_roles")
-      .select("role")
-      .in("role", ["admin", "finance"]);
-    if (!roles || roles.length === 0) {
+    const allowed = await isFinanceOrAdmin();
+    if (!allowed) {
       return NextResponse.json({ error: "Admin or Finance role required" }, { status: 403 });
     }
 
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from("directory_sync_runs")
       .select("*")
       .order("started_at", { ascending: false })
