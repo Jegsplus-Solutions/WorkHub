@@ -6,15 +6,13 @@ function requireEnv(name: string): string {
   return value;
 }
 
-const URL = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
-const ANON_KEY = requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-const SERVICE_ROLE_KEY = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
-
 /** Service-role client — bypasses RLS. Only use in trusted server-side functions. */
 export function supabaseAdmin() {
-  return createClient(URL, SERVICE_ROLE_KEY, {
-    auth: { persistSession: false },
-  });
+  return createClient(
+    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    { auth: { persistSession: false } },
+  );
 }
 
 /**
@@ -22,10 +20,14 @@ export function supabaseAdmin() {
  * Pass the Supabase access_token from the frontend session.
  */
 export function supabaseUser(jwt: string) {
-  return createClient(URL, ANON_KEY, {
-    auth: { persistSession: false },
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
-  });
+  return createClient(
+    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
+    {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+    },
+  );
 }
 
 /** Extract the user id from a JWT (without network call). Returns null on failure. */
