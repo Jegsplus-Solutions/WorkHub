@@ -35,9 +35,15 @@ async function fetchAllUsers(): Promise<GraphUser[]> {
 }
 
 async function fetchGroupMemberIds(groupId: string): Promise<Set<string>> {
-  const url = `https://graph.microsoft.com/v1.0/groups/${groupId}/members?$select=id&$top=999`;
-  const members = await graphGetAllPages<{ value: Array<{ id: string }>; "@odata.nextLink"?: string }>(url);
-  return new Set((members as Array<{ id: string }>).map((m) => m.id));
+  if (!groupId) return new Set();
+  try {
+    const url = `https://graph.microsoft.com/v1.0/groups/${groupId}/members?$select=id&$top=999`;
+    const members = await graphGetAllPages<{ value: Array<{ id: string }>; "@odata.nextLink"?: string }>(url);
+    return new Set((members as Array<{ id: string }>).map((m) => m.id));
+  } catch (err: any) {
+    console.warn(`[sync] Group ${groupId} not found or inaccessible — skipping role assignment for this group`);
+    return new Set();
+  }
 }
 
 async function fetchManagerIdForUser(userId: string): Promise<string | null> {
