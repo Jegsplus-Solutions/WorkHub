@@ -46,14 +46,23 @@ export default async function TimesheetsPage() {
   const realExpenses = exRes.data ?? [];
   const newExHref = `/expenses/new?year=${year}&week=${String(week).padStart(2, "0")}`;
 
-  // Fetch all organisation employees from directory for manager search
+  // Fetch all organisation employees from directory for manager search (paginate past 1000 limit)
   const adminDb: any = createServiceClient();
-  const { data: dirMembers } = await adminDb
-    .from("directory_members")
-    .select("azure_user_id, display_name, profile_id")
-    .not("display_name", "is", null)
-    .order("display_name");
-  const managers = (dirMembers ?? [])
+  const allDir: any[] = [];
+  let dirFrom = 0;
+  while (true) {
+    const { data } = await adminDb
+      .from("directory_members")
+      .select("azure_user_id, display_name, profile_id")
+      .not("display_name", "is", null)
+      .order("display_name")
+      .range(dirFrom, dirFrom + 999);
+    if (!data || data.length === 0) break;
+    allDir.push(...data);
+    if (data.length < 1000) break;
+    dirFrom += 1000;
+  }
+  const managers = allDir
     .filter((m: any) => m.display_name)
     .map((m: any) => ({ id: m.profile_id ?? m.azure_user_id, display_name: m.display_name }));
 

@@ -13,10 +13,22 @@ export default async function DirectoryPage() {
 
   const adminDb: any = createServiceClient();
 
-  const { data: members }: any = await adminDb
-    .from("directory_members")
-    .select("*")
-    .order("display_name");
+  // Supabase defaults to 1000 rows max — paginate to fetch all
+  const allMembers: any[] = [];
+  const PAGE_SIZE = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await adminDb
+      .from("directory_members")
+      .select("*")
+      .order("display_name")
+      .range(from, from + PAGE_SIZE - 1);
+    if (error || !data || data.length === 0) break;
+    allMembers.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  const members = allMembers;
 
   return (
     <div className="flex flex-col h-full">
