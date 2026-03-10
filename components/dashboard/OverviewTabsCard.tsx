@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 
 const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+const TIMESHEET_YEAR_OPTIONS = Array.from({ length: 101 }, (_, index) => 2000 + index);
 
 const TABS = ["Timesheets"] as const;
 type Tab = typeof TABS[number];
@@ -317,11 +318,18 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
   const approvedCnt       = monthTs.filter(t => t.status === "approved").length;
   const submittedCnt      = monthTs.filter(t => t.status === "submitted").length;
   const submittedOrBetter = monthTs.filter(t => ["approved","submitted","draft"].includes(t.status ?? "")).length;
-  const missingCnt        = Math.max(0, Math.max(0, week - 1) - submittedOrBetter);
+  const today             = new Date();
+  const currentYear       = today.getFullYear();
+  const currentMonth      = today.getMonth() + 1;
+  const currentWeek       = Math.min(Math.ceil(today.getDate() / 7), 5);
+  const isCurrentMonth    = selectedYear === currentYear && selectedMonth === currentMonth;
+  const isFutureMonth     = selectedYear > currentYear || (selectedYear === currentYear && selectedMonth > currentMonth);
+  const expectedWeeks     = isFutureMonth ? 0 : isCurrentMonth ? Math.max(0, currentWeek - 1) : numWeeks;
+  const missingCnt        = Math.max(0, expectedWeeks - submittedOrBetter);
 
   // ── Selected-week derived state ──────────────────────────────────────────
-  const isCurrentWeek = activeWeek === week;
-  const isFutureWeek  = activeWeek > week;
+  const isCurrentWeek = isCurrentMonth && activeWeek === currentWeek;
+  const isFutureWeek  = isFutureMonth || (isCurrentMonth && activeWeek > currentWeek);
   const startDay      = (activeWeek - 1) * 7 + 1;
   const endDay        = Math.min(activeWeek * 7, daysInMonth);
 
@@ -487,7 +495,7 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
           onChange={e => switchPeriod(selectedMonth, Number(e.target.value))}
           className="select-chevron rounded-lg border border-gray-200 bg-white pl-3 pr-10 py-1.5 text-sm font-bold text-gray-800 cursor-pointer focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
         >
-          {[year - 1, year, year + 1].map(y => (
+          {TIMESHEET_YEAR_OPTIONS.map(y => (
             <option key={y} value={y}>{y}</option>
           ))}
         </select>
@@ -562,8 +570,8 @@ export function OverviewTabsCard({ year, month, week, realTimesheets, realExpens
             {Array.from({ length: numWeeks }, (_, i) => {
               const w    = i + 1;
               const ts   = monthTs.find(t => t.week_number === w);
-              const isCurr = w === week;
-              const isFut  = w > week;
+              const isCurr = isCurrentMonth && w === currentWeek;
+              const isFut  = isFutureMonth || (isCurrentMonth && w > currentWeek);
 
               let dot = "bg-gray-200";
               if (ts?.status === "approved")              dot = "bg-emerald-500";

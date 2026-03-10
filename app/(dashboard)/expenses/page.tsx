@@ -10,6 +10,12 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+const EXPENSE_YEAR_OPTIONS = Array.from({ length: 101 }, (_, index) => 2000 + index);
+const EXPENSE_WEEK_OPTIONS = Array.from({ length: 52 }, (_, index) => String(index + 1).padStart(2, "0"));
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
 
 function currentWeekNumber(): string {
   const now = new Date();
@@ -25,8 +31,10 @@ export default async function ExpensesPage({
 }) {
   const sp = await searchParams;
   const now = new Date();
-  const filterYear = sp.year ? parseInt(sp.year) : now.getFullYear();
-  const filterMonth = sp.month ? parseInt(sp.month) : now.getMonth() + 1; // 1-indexed
+  const rawYear = sp.year ? Number.parseInt(sp.year, 10) : now.getFullYear();
+  const rawMonth = sp.month ? Number.parseInt(sp.month, 10) : now.getMonth() + 1;
+  const filterYear = clamp(Number.isFinite(rawYear) ? rawYear : now.getFullYear(), 2000, 2100);
+  const filterMonth = clamp(Number.isFinite(rawMonth) ? rawMonth : now.getMonth() + 1, 1, 12); // 1-indexed
 
   // Date range for the selected month
   const monthStart = `${filterYear}-${String(filterMonth).padStart(2, "0")}-01`;
@@ -106,6 +114,53 @@ export default async function ExpensesPage({
               </svg>
             </Link>
           </div>
+
+          <form action="/expenses/new" className="mb-6 rounded-xl border border-border bg-card p-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-[120px]">
+                <label htmlFor="expense-year" className="block text-xs font-medium text-muted-foreground mb-1">
+                  Year
+                </label>
+                <select
+                  id="expense-year"
+                  name="year"
+                  defaultValue={String(filterYear)}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                >
+                  {EXPENSE_YEAR_OPTIONS.map((optionYear) => (
+                    <option key={optionYear} value={optionYear}>
+                      {optionYear}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="min-w-[120px]">
+                <label htmlFor="expense-week" className="block text-xs font-medium text-muted-foreground mb-1">
+                  Week
+                </label>
+                <select
+                  id="expense-week"
+                  name="week"
+                  defaultValue={week}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                >
+                  {EXPENSE_WEEK_OPTIONS.map((optionWeek) => (
+                    <option key={optionWeek} value={optionWeek}>
+                      Week {optionWeek}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                Create Claim
+              </button>
+            </div>
+          </form>
 
           {!reports?.length ? (
             <div className="text-center py-16">
