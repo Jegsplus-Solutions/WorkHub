@@ -170,7 +170,6 @@ export default async function ExpenseReportPage({
           rejectedAt={report.rejected_at}
           managerComments={report.manager_comments}
           employeeNotes={report.employee_notes}
-          destination={report.destination}
           auditLog={auditLog}
         />
       </div>

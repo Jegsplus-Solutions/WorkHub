@@ -165,9 +165,13 @@ export function buildWeekDraftPayload(
   const payloadEntries: Record<string, TimesheetDayEntry[]> = {};
 
   for (const day of getTimesheetWeekDayNumbers(year, month, week)) {
-    const entries = (dayEntries[day] ?? []).filter(hasAnyTimesheetEntryValue);
-    if (entries.length > 0) {
-      payloadEntries[String(day)] = entries.map((entry) => ({ ...entry }));
+    const allEntries = dayEntries[day] ?? [];
+    const filledEntries = allEntries.filter(hasAnyTimesheetEntryValue);
+    // Preserve all entries (including empty slots) when the user has
+    // explicitly added extra rows, so they survive a page reload.
+    const entriesToSave = allEntries.length > 1 ? allEntries : filledEntries;
+    if (entriesToSave.length > 0) {
+      payloadEntries[String(day)] = entriesToSave.map((entry) => ({ ...entry }));
     }
   }
 

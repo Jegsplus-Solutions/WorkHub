@@ -40,7 +40,6 @@ interface ExpenseWeekClientProps {
   rejectedAt?: string | null;
   managerComments?: string | null;
   employeeNotes?: string | null;
-  destination?: string | null;
   auditLog: any[];
 }
 
@@ -63,7 +62,6 @@ export function ExpenseWeekClient({
   defaultManagerId = "",
   managerComments,
   employeeNotes,
-  destination: initialDestination,
   auditLog,
 }: ExpenseWeekClientProps) {
   const receiptOwnerId = employeeId ?? userId;
@@ -76,7 +74,6 @@ export function ExpenseWeekClient({
   const [rejectionText, setRejectionText] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [notes, setNotes] = useState(employeeNotes ?? "");
-  const [destination, setDestination] = useState(initialDestination ?? "");
   const [selectedManager, setSelectedManager] = useState(managerId ?? defaultManagerId ?? "");
   const [receiptPaths, setReceiptPaths] = useState<Record<number, string | null>>({});
 
@@ -147,7 +144,6 @@ export function ExpenseWeekClient({
             month,
             week_number: weekNumber,
             week_beginning_date: weekBeginningDate,
-            destination: destination || null,
             status: "draft",
             employee_notes: notes || null,
           })
@@ -160,7 +156,6 @@ export function ExpenseWeekClient({
         // so RLS still allows entry writes (status must be draft/rejected/manager_rejected)
         const { error } = await (supabase.from as any)("expense_reports")
           .update({
-            destination: destination || null,
             employee_notes: notes || null,
           })
           .eq("id", rId);
@@ -170,7 +165,6 @@ export function ExpenseWeekClient({
         const { error } = await (supabase.from as any)("expense_reports")
           .update({
             status: status,
-            destination: destination || null,
             employee_notes: notes || null,
           })
           .eq("id", rId);
@@ -305,8 +299,6 @@ export function ExpenseWeekClient({
         <h1 className="text-xl font-bold">Expense Report — Week {Number.parseInt(weekNumber, 10)}, {EXPENSE_MONTH_NAMES[month - 1]} {year}</h1>
         <div className="grid grid-cols-2 gap-x-8 gap-y-1 mt-2 text-sm">
           <div><span className="font-semibold">Status:</span> {status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</div>
-          {destination && <div><span className="font-semibold">Destination:</span> {destination}</div>}
-          {notes && <div className="col-span-2"><span className="font-semibold">Notes:</span> {notes}</div>}
         </div>
         <hr className="mt-3 border-gray-300" />
       </div>
@@ -382,7 +374,7 @@ export function ExpenseWeekClient({
         </div>
       )}
 
-      {/* Manager + Destination + Notes fields */}
+      {/* Manager field */}
       {canEdit && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 no-print">
           <div>
@@ -392,26 +384,6 @@ export function ExpenseWeekClient({
               value={selectedManager}
               onChange={setSelectedManager}
               label=""
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Destination</label>
-            <input
-              type="text"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder="e.g. Calgary — Client site"
-              className="mt-1 w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes (optional)</label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add notes for your manager…"
-              className="mt-1 w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
         </div>
