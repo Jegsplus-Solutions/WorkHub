@@ -20,7 +20,7 @@ export default async function DirectoryPage() {
   while (true) {
     const { data, error } = await adminDb
       .from("directory_members")
-      .select("*")
+      .select("*, profile:profiles!directory_members_profile_id_fkey(avatar_url)")
       .not("office_location", "is", null)
       .order("display_name")
       .range(from, from + PAGE_SIZE - 1);

@@ -15,6 +15,7 @@ type DirectoryMember = {
   employee_id: string | null;
   manager_azure_id: string | null;
   profile_id: string | null;
+  profile: { avatar_url: string | null } | null;
   synced_at: string;
 };
 
@@ -163,11 +164,19 @@ export default function DirectoryPanel({ members }: { members: DirectoryMember[]
                 <tr key={m.id} className={`hover:bg-accent/30 transition-colors ${m.profile_id ? "cursor-pointer" : ""}`}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {(m.display_name ?? "?").charAt(0).toUpperCase()}
-                        </span>
-                      </div>
+                      {m.profile?.avatar_url ? (
+                        <img
+                          src={m.profile.avatar_url}
+                          alt={m.display_name ?? ""}
+                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {(m.display_name ?? "?").charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
                       <div>
                         <div className="font-medium">
                           {m.profile_id ? (
