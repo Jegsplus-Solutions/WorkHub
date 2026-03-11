@@ -2,8 +2,8 @@ import { createServerSupabaseClient, getCurrentUserRole } from "@/lib/supabase/s
 import { redirect, notFound } from "next/navigation";
 import { TopBar } from "@/components/layout/TopBar";
 import EmployeeProfilePanel from "@/components/admin/EmployeeProfilePanel";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+
+
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Employee Profile" };
@@ -85,18 +85,7 @@ export default async function AdminEmployeeProfilePage({
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar
-        title="Employee Profile"
-        actions={
-          <Link
-            href="/admin/directory"
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Directory
-          </Link>
-        }
-      />
+      <TopBar breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Directory", href: "/admin/directory" }, { label: profile.display_name || "Employee" }]} />
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-4xl mx-auto">
           <EmployeeProfilePanel

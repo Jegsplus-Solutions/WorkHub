@@ -24,7 +24,7 @@ export default async function DirectorySyncPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar title="Directory Sync" />
+      <TopBar breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Directory Sync" }]} />
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-5xl mx-auto">
           <DirectorySyncPanel

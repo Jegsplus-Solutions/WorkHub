@@ -59,7 +59,7 @@ export default async function ApprovalDetailPage({ params, searchParams }: Props
 
     return (
       <div className="flex flex-col h-full">
-        <TopBar title="Timesheet Approval" />
+        <TopBar breadcrumbs={[{ label: "Approvals", href: "/approvals" }, { label: "Timesheet" }]} />
         <div className="flex-1 overflow-y-auto p-6">
           <ApprovalDetailClient
             type="timesheet"
@@ -86,7 +86,7 @@ export default async function ApprovalDetailPage({ params, searchParams }: Props
 
     return (
       <div className="flex flex-col h-full">
-        <TopBar title="Expense Approval" />
+        <TopBar breadcrumbs={[{ label: "Approvals", href: "/approvals" }, { label: "Expense" }]} />
         <div className="flex-1 overflow-y-auto p-6">
           <ApprovalDetailClient
             type="expense"
@@ -112,7 +112,7 @@ export default async function ApprovalDetailPage({ params, searchParams }: Props
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar title="Leave Approval" />
+      <TopBar breadcrumbs={[{ label: "Approvals", href: "/approvals" }, { label: "Leave" }]} />
       <div className="flex-1 overflow-y-auto p-6">
         <ApprovalDetailClient
           type="leave"

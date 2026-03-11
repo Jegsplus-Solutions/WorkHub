@@ -1,4 +1,4 @@
-import { createServerSupabaseClient, getCurrentUserRole } from "@/lib/supabase/server";
+import { createServerSupabaseClient, createServiceClient, getCurrentUserRole } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { TopBar } from "@/components/layout/TopBar";
 import Link from "next/link";
@@ -15,8 +15,10 @@ export default async function PeoplePage() {
   const role = await getCurrentUserRole();
   if (role !== "admin") redirect("/dashboard");
 
-  // Only show profiles that have a directory_members entry with an office_location
-  const { data: allPeople }: any = await supabase
+  // Use service role client to bypass RLS on directory_members
+  const adminDb: any = createServiceClient();
+
+  const { data: allPeople }: any = await adminDb
     .from("profiles")
     .select(`
       id, display_name, email, department, job_title,

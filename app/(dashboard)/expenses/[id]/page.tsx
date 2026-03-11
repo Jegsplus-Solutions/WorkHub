@@ -72,7 +72,7 @@ export default async function ExpenseReportPage({
 
     return (
       <div className="flex flex-col h-full">
-        <TopBar title={`New Expense Claim — ${periodLabel}`} />
+        <TopBar breadcrumbs={[{ label: "Expenses", href: "/expenses" }, { label: `New — ${periodLabel}` }]} />
         <div className="flex-1 overflow-y-auto p-6">
           <ExpenseWeekClient
             reportId={null}
@@ -146,7 +146,7 @@ export default async function ExpenseReportPage({
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar title={`Expense Claim — ${periodLabel}`} />
+      <TopBar breadcrumbs={[{ label: "Expenses", href: "/expenses" }, { label: periodLabel }]} />
       <div className="flex-1 overflow-y-auto p-6">
         <ExpenseWeekClient
           reportId={report.id}

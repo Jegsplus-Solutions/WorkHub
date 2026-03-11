@@ -45,7 +45,7 @@ export default async function DirectoryPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar title="Employee Directory" />
+      <TopBar breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Employee Directory" }]} />
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
           <DirectoryPanel members={members ?? []} />

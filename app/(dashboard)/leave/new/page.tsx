@@ -23,7 +23,7 @@ export default async function NewLeavePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar title="New Leave Request" />
+      <TopBar breadcrumbs={[{ label: "Leave", href: "/leave" }, { label: "New Request" }]} />
       <div className="flex-1 overflow-y-auto p-6">
         <LeaveRequestClient
           leaveId={null}

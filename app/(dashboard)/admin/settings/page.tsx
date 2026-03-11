@@ -33,7 +33,7 @@ export default async function AdminSettingsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar title="Microsoft 365 Settings" />
+      <TopBar breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Microsoft 365 Settings" }]} />
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-3xl mx-auto">
           <AppConfigPanel initialRows={configRows} />

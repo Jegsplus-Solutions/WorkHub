@@ -20,7 +20,7 @@ export default async function SharePointSyncPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar title="SharePoint Sync" />
+      <TopBar breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "SharePoint Sync" }]} />
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-5xl mx-auto">
           <SharePointSyncPanel logs={logs ?? []} />

@@ -23,7 +23,7 @@ export default async function DirectoryHealthPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <TopBar title="Directory Health" />
+      <TopBar breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Directory Health" }]} />
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto">
           <DirectoryHealthPanel

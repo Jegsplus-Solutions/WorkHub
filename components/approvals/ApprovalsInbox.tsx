@@ -25,15 +25,26 @@ interface ApprovalsInboxProps {
   userRole: "manager" | "finance" | "admin";
 }
 
+type FilterTab = "all" | "timesheet" | "expense" | "leave";
+const FILTER_TABS: { key: FilterTab; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "timesheet", label: "Timesheets" },
+  { key: "expense", label: "Expenses" },
+  { key: "leave", label: "Leave" },
+];
+
 export function ApprovalsInbox({ items: initialItems, managerId, userRole }: ApprovalsInboxProps) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
+  const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [activeItem, setActiveItem] = useState<ApprovalItem | null>(items[0] ?? null);
   const [processing, setProcessing] = useState(false);
   const [rejectionText, setRejectionText] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [bulkRejectTarget, setBulkRejectTarget] = useState<string[]>([]);
+
+  const filteredItems = activeTab === "all" ? items : items.filter((i) => i.type === activeTab);
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -45,10 +56,12 @@ export function ApprovalsInbox({ items: initialItems, managerId, userRole }: App
   }
 
   function toggleAll() {
-    if (selected.size === items.length) {
-      setSelected(new Set());
+    const filteredIds = new Set(filteredItems.map((i) => i.id));
+    const allFilteredSelected = filteredItems.every((i) => selected.has(i.id));
+    if (allFilteredSelected) {
+      setSelected((prev) => { const next = new Set(prev); filteredIds.forEach((id) => next.delete(id)); return next; });
     } else {
-      setSelected(new Set(items.map((i) => i.id)));
+      setSelected((prev) => new Set([...prev, ...filteredIds]));
     }
   }
 
@@ -125,7 +138,8 @@ export function ApprovalsInbox({ items: initialItems, managerId, userRole }: App
     }
   }
 
-  const selectedIds = Array.from(selected);
+  const filteredSet = new Set(filteredItems.map((i) => i.id));
+  const selectedIds = Array.from(selected).filter((id) => filteredSet.has(id));
 
   return (
     <div className="flex flex-col md:flex-row h-full">
@@ -154,26 +168,47 @@ export function ApprovalsInbox({ items: initialItems, managerId, userRole }: App
           </div>
         )}
 
+        {/* Tab bar */}
+        <div className="flex border-b border-border bg-muted/10 px-1 gap-0.5">
+          {FILTER_TABS.map((tab) => {
+            const count = tab.key === "all" ? items.length : items.filter((i) => i.type === tab.key).length;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => { setActiveTab(tab.key); setSelected(new Set()); }}
+                className={cn(
+                  "flex-1 px-2 py-2 text-[11px] font-medium border-b-2 transition-colors text-center",
+                  activeTab === tab.key
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
         {/* Header */}
         <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/30">
           <input
             type="checkbox"
-            checked={selected.size === items.length && items.length > 0}
+            checked={filteredItems.length > 0 && filteredItems.every((i) => selected.has(i.id))}
             onChange={toggleAll}
             className="rounded"
           />
-          <span className="text-xs font-medium text-muted-foreground">{items.length} pending</span>
+          <span className="text-xs font-medium text-muted-foreground">{filteredItems.length} pending</span>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {items.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full py-8 text-center px-4">
               <CheckCircle className="w-10 h-10 text-emerald-500 mb-3" />
               <p className="font-medium text-sm">All caught up!</p>
               <p className="text-xs text-muted-foreground mt-1">No pending approvals</p>
             </div>
           ) : (
-            items.map((item) => (
+            filteredItems.map((item) => (
               <div
                 key={item.id}
                 onClick={() => setActiveItem(item)}
