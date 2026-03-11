@@ -29,7 +29,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/expenses", label: "Expense", roles: ["employee", "manager", "admin", "finance"] },
   { href: "/leave", label: "Leave", roles: ["employee", "manager", "admin", "finance"] },
   { href: "/approvals", label: "Approvals", roles: ["manager", "admin", "finance"] },
-  { href: "/people", label: "Team", roles: ["manager", "admin", "finance"] },
   { href: "/reports", label: "Documents", roles: ["manager", "admin", "finance"] },
 ];
 
@@ -119,7 +118,7 @@ export function TopNav({
         ]);
         setResults([
           ...(ex.data ?? []).map((e: any) => ({ id: e.id, type: "expense" as const, label: `Expenses — ${e.month ? `${e.month}/` : ""}${e.year} Wk${e.week_number}`, sublabel: e.status, href: `/expenses/${e.id}` })),
-          ...(matchingProfiles ?? []).map((p: any) => ({ id: p.id, type: "person" as const, label: p.display_name, sublabel: p.email, href: `/people/${p.id}` })),
+          ...(matchingProfiles ?? []).map((p: any) => ({ id: p.id, type: "person" as const, label: p.display_name, sublabel: p.email, href: `/admin/employees/${p.id}` })),
         ]);
       } finally { setSearchLoading(false); }
     }, 300);

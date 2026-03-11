@@ -38,8 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/leave", label: "Leave", icon: CalendarOff },
   { href: "/approvals", label: "Approvals", icon: CheckSquare, managerOnly: true },
   { href: "/reports", label: "Reports", icon: BarChart3, managerOnly: true },
-  { href: "/people", label: "People", icon: Users, adminOnly: true },
-  { href: "/admin", label: "Admin", icon: ShieldCheck, adminOnly: true },
+{ href: "/admin", label: "Admin", icon: ShieldCheck, adminOnly: true },
   { href: "/admin/directory-health", label: "Dir. Health", icon: HeartPulse, adminOnly: true },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
