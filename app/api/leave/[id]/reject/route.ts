@@ -31,7 +31,8 @@ export async function POST(
     const { id: leaveId } = await params;
     if (!leaveId) return NextResponse.json({ error: "Missing leave request id" }, { status: 400 });
 
-    const body = await req.json().catch(() => ({}));
+    let body;
+    try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
     const { managerComments } = BodySchema.parse(body);
 
     const { data: lr, error: lrErr }: any = await supabase
@@ -72,6 +73,7 @@ export async function POST(
 
     return NextResponse.json({ ok: true, leaveRequest: updated });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 400 });
+    if (e?.name === "ZodError") return NextResponse.json({ error: e.issues?.[0]?.message ?? "Validation error" }, { status: 422 });
+    return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 500 });
   }
 }

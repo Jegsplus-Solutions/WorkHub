@@ -27,7 +27,8 @@ export async function POST(
     const { id: reportId } = await params;
     if (!reportId) return NextResponse.json({ error: "Missing report id in path" }, { status: 400 });
 
-    const body = await req.json().catch(() => ({}));
+    let body;
+    try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
     const { managerComments } = BodySchema.parse(body);
 
     const { data: r, error: rErr }: any = await supabase
@@ -59,7 +60,7 @@ export async function POST(
     if (uErr) return NextResponse.json({ error: uErr.message }, { status: 400 });
 
     await writeAudit({
-      actorUserId: r.manager_id ?? null,
+      actorUserId: user.id,
       entityType: "expense_report",
       entityId: reportId,
       action: "approve",
@@ -72,7 +73,7 @@ export async function POST(
     try {
       await syncExpenseReportToSharePoint(reportId);
       await writeAudit({
-        actorUserId: r.manager_id ?? null,
+        actorUserId: user.id,
         entityType: "sharepoint_sync",
         entityId: reportId,
         action: "sync_success",
@@ -81,7 +82,7 @@ export async function POST(
     } catch (syncErr: any) {
       sharepointSync = { ok: false, error: syncErr?.message };
       await writeAudit({
-        actorUserId: r.manager_id ?? null,
+        actorUserId: user.id,
         entityType: "sharepoint_sync",
         entityId: reportId,
         action: "sync_failed",
@@ -91,6 +92,7 @@ export async function POST(
 
     return NextResponse.json({ ok: true, report: updated, sharepointSync });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 400 });
+    if (e?.name === "ZodError") return NextResponse.json({ error: e.issues?.[0]?.message ?? "Validation error" }, { status: 422 });
+    return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 500 });
   }
 }

@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Directory Sync" };
 
 export default async function DirectorySyncPage() {
   const role = await getCurrentUserRole();
-  if (role !== "admin") redirect("/unauthorized");
+  if (role !== "admin") redirect("/dashboard");
 
   const supabase = await createServerSupabaseClient();
 

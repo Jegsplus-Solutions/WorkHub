@@ -27,9 +27,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { type, id } = (await req.json()) as { type: "timesheet" | "expense"; id: string };
-  if (!type || !id) {
-    return NextResponse.json({ error: "Missing type or id" }, { status: 400 });
+  let rawBody;
+  try { rawBody = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+  const { type, id } = rawBody as { type: string; id: string };
+  if (!type || !id || !["timesheet", "expense"].includes(type)) {
+    return NextResponse.json({ error: "Missing or invalid type/id" }, { status: 400 });
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

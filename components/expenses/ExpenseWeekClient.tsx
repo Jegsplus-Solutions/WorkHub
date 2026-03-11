@@ -102,7 +102,7 @@ export function ExpenseWeekClient({
         // Storage not available or bucket missing — ignore
       }
     })();
-  }, [reportId, receiptOwnerId]);
+  }, [reportId, receiptOwnerId, supabase.storage]);
 
   const isDraft = status === "draft";
   const isSubmitted = status === "submitted";

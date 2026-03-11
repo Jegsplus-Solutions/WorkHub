@@ -155,7 +155,7 @@ export function TopNav({
       </div>
 
       {/* Nav pills */}
-      <nav className="flex items-center gap-1.5 ml-[228px]">
+      <nav className="flex items-center gap-1.5 ml-6">
         {visibleNavItems.map((item) => {
           const href = navHref(item);
           const active = isActive(item);

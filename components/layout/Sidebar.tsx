@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Clock,
   Receipt,
   CalendarOff,
   CheckSquare,
@@ -32,6 +33,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Grid3X3 },
+  { href: "/timesheets", label: "Timesheets", icon: Clock },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/leave", label: "Leave", icon: CalendarOff },
   { href: "/approvals", label: "Approvals", icon: CheckSquare, managerOnly: true },
